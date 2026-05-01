@@ -1,0 +1,104 @@
+@page "/cookies"
+
+<div class="page-enter legal-page">
+    <AppNavbar />
+
+    <div class="legal-shell">
+        <p class="legal-kicker">Documenti legali</p>
+        <h1 class="legal-title">Cookie Policy</h1>
+        <p class="legal-updated">Ultimo aggiornamento: maggio 2025</p>
+
+        <div class="legal-body">
+            <p>
+                Questa Cookie Policy spiega come HorrorFriday utilizza lo storage del browser
+                (localStorage e sessionStorage) e perché. Non utilizziamo cookie di profilazione,
+                cookie di terze parti per il tracciamento, né sistemi di analisi comportamentale.
+            </p>
+
+            <h2>Cosa usiamo e perché</h2>
+            <p>
+                HorrorFriday non imposta cookie HTTP tradizionali per la sessione utente.
+                Utilizziamo invece <strong>Web Storage API</strong> (localStorage e sessionStorage)
+                del browser, che funzionano in modo simile ma rimangono sul tuo dispositivo e non vengono
+                mai inviati automaticamente ai server con ogni richiesta HTTP.
+            </p>
+
+            <h2>Storage tecnico necessario</h2>
+            <p>
+                Questo storage è strettamente necessario per il funzionamento del Servizio.
+                Non richiede consenso ai sensi dell'art. 5(3) della Direttiva ePrivacy e del GDPR
+                in quanto essenziale per l'erogazione del Servizio richiesto dall'utente.
+            </p>
+
+            <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <th style="text-align:left;padding:8px 4px;color:var(--text);font-weight:600">Chiave</th>
+                        <th style="text-align:left;padding:8px 4px;color:var(--text);font-weight:600">Storage</th>
+                        <th style="text-align:left;padding:8px 4px;color:var(--text);font-weight:600">Contenuto</th>
+                        <th style="text-align:left;padding:8px 4px;color:var(--text);font-weight:600">Durata</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:8px 4px"><code>hf_token</code></td>
+                        <td style="padding:8px 4px">localStorage / sessionStorage</td>
+                        <td style="padding:8px 4px">JWT di autenticazione</td>
+                        <td style="padding:8px 4px">15 minuti (poi rinnovato automaticamente)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:8px 4px"><code>hf_refresh_token</code></td>
+                        <td style="padding:8px 4px">localStorage / sessionStorage</td>
+                        <td style="padding:8px 4px">Token di rinnovo sessione</td>
+                        <td style="padding:8px 4px">7 giorni</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:8px 4px"><code>hf_userid</code>, <code>hf_username</code>, <code>hf_email</code></td>
+                        <td style="padding:8px 4px">localStorage / sessionStorage</td>
+                        <td style="padding:8px 4px">Dati identificativi utente per la UI</td>
+                        <td style="padding:8px 4px">Per la durata della sessione</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:8px 4px"><code>hf_cookie_consent</code></td>
+                        <td style="padding:8px 4px">localStorage</td>
+                        <td style="padding:8px 4px">Registrazione presa visione dell'informativa</td>
+                        <td style="padding:8px 4px">Indefinita (fino alla pulizia del browser)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>
+                La scelta <strong>localStorage vs sessionStorage</strong> dipende dall'opzione "Ricordami"
+                al momento del login: se selezionata, i token rimangono tra una sessione e l'altra
+                (localStorage); altrimenti vengono eliminati alla chiusura del browser (sessionStorage).
+            </p>
+
+            <h2>Cookie di Google (solo per accesso con Google)</h2>
+            <p>
+                Se utilizzi il login tramite Google, il pulsante "Accedi con Google" carica il servizio
+                <strong>Google Identity Services</strong> (accounts.google.com). Google potrebbe impostare
+                i propri cookie di sessione per gestire il flusso di autenticazione OAuth.
+                Questi cookie sono soggetti alla
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy di Google</a>.
+                Non abbiamo controllo su di essi e non li utilizziamo per tracciare gli utenti.
+            </p>
+
+            <h2>Come gestire o eliminare lo storage</h2>
+            <p>
+                Puoi eliminare in qualsiasi momento i dati salvati nel tuo browser tramite le impostazioni
+                dello stesso (solitamente in <em>Strumenti → Cancella dati di navigazione → Cookie e altri
+                dati dei siti</em>). L'eliminazione comporterà il logout automatico dal Servizio.
+            </p>
+            <p>
+                Puoi anche effettuare il logout direttamente da <a href="/settings">Impostazioni</a>,
+                che rimuove tutti i dati di sessione dal browser.
+            </p>
+
+            <h2>Contatti</h2>
+            <p>
+                Per qualsiasi domanda su questa Cookie Policy scrivi a
+                <a href="mailto:support.horrorfriday@gmail.com">support.horrorfriday@gmail.com</a>.
+            </p>
+        </div>
+    </div>
+</div>

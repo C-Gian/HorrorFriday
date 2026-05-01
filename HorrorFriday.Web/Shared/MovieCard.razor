@@ -1,0 +1,88 @@
+@using HorrorFriday.Web.Models
+
+<div class="poster-card" @onclick="HandleNavigate" @onmouseleave="HandleMouseLeave">
+    @if (!string.IsNullOrEmpty(Movie.PosterPath))
+    {
+        <img class="poster-img"
+             src="https://image.tmdb.org/t/p/w300@(Movie.PosterPath)"
+             alt="@Movie.Title"
+             loading="lazy" />
+    }
+    else
+    {
+        <div class="poster-placeholder">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                 stroke="var(--text-muted)" stroke-width="1">
+                <rect x="2" y="2" width="20" height="20" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+            </svg>
+        </div>
+    }
+
+    <div class="poster-overlay">
+        <span class="poster-title">@Movie.Title</span>
+        <span class="poster-meta">
+            @if (Movie.ReleaseYear.HasValue)
+            {
+                @Movie.ReleaseYear
+            }
+            @if (Movie.RuntimeMinutes.HasValue)
+            {
+                <text> &middot; @(Movie.RuntimeMinutes)m</text>
+            }
+        </span>
+    </div>
+
+    @if (Movie.VoteAverage.HasValue && Movie.VoteAverage > 0)
+    {
+        <div class="poster-rating">
+            &#9733; @Movie.VoteAverage.Value.ToString("0.0")
+        </div>
+    }
+
+    <div class="poster-hover-overlay">
+        <p class="poster-hover-overview">
+            @TruncateText(Movie.Overview, 180)
+        </p>
+    </div>
+
+    @if (IsLoggedIn)
+    {
+        <div class="poster-status" @onclick:stopPropagation="true">
+            <button class="poster-status-btn @(HasStatus ? $"poster-status-btn--{Status}" : "poster-status-btn--empty")"
+                    @onclick="HandleToggleStatusPicker"
+                    title="@(HasStatus ? GetStatusLabel(Status!) : "Add to list")">
+                @if (HasStatus)
+                {
+                    <span>@GetStatusLabel(Status!)</span>
+                }
+                else
+                {
+                    <span class="poster-status-add">+</span>
+                }
+            </button>
+
+            @if (IsStatusPickerOpen)
+            {
+                <div class="poster-status-picker">
+                    @foreach (var option in StatusOptions)
+                    {
+                        <button class="status-option status-option--@option.Value"
+                                @onclick="() => HandleStatusChanged(option.Value)">
+                            @option.Label
+                        </button>
+                    }
+
+                    @if (HasStatus)
+                    {
+                        <button class="status-option status-option--remove"
+                                @onclick="() => HandleStatusChanged(null)">
+                            Remove
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>

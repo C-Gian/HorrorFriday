@@ -1,0 +1,30 @@
+@typeparam TItem
+
+<div class="hf-custom-select @(IsOpen ? "hf-custom-select--open" : "")">
+    <button type="button"
+            class="hf-custom-select__trigger"
+            @onclick="Toggle"
+            @onclick:stopPropagation>
+        <span>@GetSelectedText()</span>
+        <span class="hf-custom-select__caret">▾</span>
+    </button>
+    @if (IsOpen)
+    {
+        @* Invisible full-screen backdrop to catch outside clicks *@
+        <div class="hf-custom-select__backdrop" @onclick="Close" @onclick:stopPropagation></div>
+        <div class="hf-custom-select__dropdown">
+            @foreach (var option in Options)
+            {
+                var val = ValueSelector(option);
+                var text = TextSelector(option);
+                var isSelected = val == Value;
+                <button type="button"
+                        class="hf-custom-select__option @(isSelected ? "hf-custom-select__option--selected" : "")"
+                        @onclick="() => SelectOption(val)"
+                        @onclick:stopPropagation>
+                    @text
+                </button>
+            }
+        </div>
+    }
+</div>

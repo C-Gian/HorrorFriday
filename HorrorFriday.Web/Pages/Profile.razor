@@ -1,0 +1,96 @@
+@page "/profile"
+
+<div class="page-enter account-page">
+    <AppNavbar />
+
+    <main class="account-shell">
+        <section class="account-hero">
+            <div class="account-avatar account-avatar--large">@UserInitials</div>
+            <div>
+                <p class="account-kicker">My profile</p>
+                <h1 class="account-title">@Username</h1>
+                <p class="account-subtitle">Your private horror ledger: saved films, ratings, notes, and abandoned watches.</p>
+            </div>
+        </section>
+
+        @if (IsLoading)
+        {
+            <LoadingSpinner Size="large" Message="Loading your library..." />
+        }
+        else
+        {
+            <section class="profile-stats">
+                <div class="profile-stat">
+                    <span class="profile-stat__value">@Library.Count</span>
+                    <span class="profile-stat__label">saved</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat__value">@CountByStatus("watched")</span>
+                    <span class="profile-stat__label">watched</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat__value">@RatedCount</span>
+                    <span class="profile-stat__label">rated</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat__value">@AverageRatingText</span>
+                    <span class="profile-stat__label">avg rating</span>
+                </div>
+            </section>
+
+            <section class="profile-toolbar">
+                @foreach (var option in FilterOptions)
+                {
+                    <button type="button"
+                            class="profile-tab @(ActiveFilter == option.Value ? "profile-tab--active" : "")"
+                            @onclick="() => SetFilter(option.Value)">
+                        @option.Label
+                        <span>@CountForFilter(option.Value)</span>
+                    </button>
+                }
+            </section>
+
+            @if (FilteredLibrary.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-state-icon">∅</div>
+                    <p class="empty-state-text">No films in this section yet.</p>
+                </div>
+            }
+            else
+            {
+                <section class="profile-library-grid">
+                    @foreach (var item in FilteredLibrary)
+                    {
+                        <article class="profile-movie-card" @onclick="() => OpenMovie(item.Movie.Id)">
+                            @if (!string.IsNullOrWhiteSpace(item.Movie.PosterPath))
+                            {
+                                <img src="https://image.tmdb.org/t/p/w300@(item.Movie.PosterPath)"
+                                     alt="@item.Movie.Title"
+                                     class="profile-movie-card__poster"
+                                     loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="profile-movie-card__poster profile-movie-card__poster--empty">No poster</div>
+                            }
+                            <div class="profile-movie-card__body">
+                                <span class="profile-status profile-status--@item.Status">@GetStatusLabel(item.Status)</span>
+                                <h2>@item.Movie.Title</h2>
+                                <p>@FormatMovieMeta(item)</p>
+                                @if (item.UserRating.HasValue)
+                                {
+                                    <span class="profile-rating">Your rating @item.UserRating/10</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <p class="profile-note">@item.Notes</p>
+                                }
+                            </div>
+                        </article>
+                    }
+                </section>
+            }
+        }
+    </main>
+</div>

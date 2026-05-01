@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.csproj.user
+
+# Dataset e file di import grandi
+*.csv
+*.tsv
+*.json.gz
+
+# Checkpoint file dell'importer
+checkpoint.txt
+
+# Secrets
+appsettings.Development.json
+*.env
+HorrorFriday.Web/wwwroot/appsettings.json
+
+# Ignora solo la data dell'importer
+HorrorFriday.Importer/data/

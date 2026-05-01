@@ -1,0 +1,61 @@
+@using HorrorFriday.Web.Services
+
+<nav class="navbar">
+    <a href="/" class="navbar-brand">
+        <div class="navbar-logo">
+            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <mask id="fm">
+                        <rect width="22" height="18" rx="2" fill="white"/>
+                        <rect x="1" y="1.5" width="2.5" height="3" rx="0.6" fill="black"/>
+                        <rect x="1" y="7" width="2.5" height="3" rx="0.6" fill="black"/>
+                        <rect x="1" y="12.5" width="2.5" height="3" rx="0.6" fill="black"/>
+                        <rect x="18.5" y="1.5" width="2.5" height="3" rx="0.6" fill="black"/>
+                        <rect x="18.5" y="7" width="2.5" height="3" rx="0.6" fill="black"/>
+                        <rect x="18.5" y="12.5" width="2.5" height="3" rx="0.6" fill="black"/>
+                    </mask>
+                </defs>
+                <rect width="22" height="18" rx="2" fill="rgba(255,255,255,0.88)" mask="url(#fm)"/>
+            </svg>
+        </div>
+        <div class="navbar-wordmark">
+            <span class="navbar-wordmark__label">Horror</span>
+            <span class="navbar-wordmark__title">Friday</span>
+        </div>
+    </a>
+
+    <div class="navbar-right">
+        @if (AuthService.IsLoggedIn && AuthService.CurrentUser is not null)
+        {
+            <div class="user-menu" id="user-menu">
+                <button class="user-menu__trigger" @onclick="ToggleMenu" type="button">
+                    <span class="user-menu__avatar">@GetInitials(AuthService.CurrentUser)</span>
+                    <span class="user-menu__name">@AuthService.CurrentUser.Username</span>
+                    <span class="user-menu__caret">▾</span>
+                </button>
+
+                @if (IsMenuOpen)
+                {
+                    <div class="user-menu__dropdown">
+                        <div class="user-menu__identity">
+                            <span class="user-menu__identity-name">@AuthService.CurrentUser.Username</span>
+                            @if (!string.IsNullOrWhiteSpace(AuthService.CurrentUser.Email))
+                            {
+                                <span class="user-menu__identity-email">@AuthService.CurrentUser.Email</span>
+                            }
+                        </div>
+                        <a class="user-menu__item" href="/profile" @onclick="CloseMenu">My profile</a>
+                        <a class="user-menu__item" href="/settings" @onclick="CloseMenu">Settings</a>
+                        <button class="user-menu__item user-menu__item--danger" @onclick="LogoutAsync" type="button">
+                            Sign out
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <a href="/login" class="navbar-signin-btn">Sign in</a>
+        }
+    </div>
+</nav>

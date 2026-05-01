@@ -1,0 +1,15 @@
+@* 
+    Reusable loading spinner component.
+    Usage: <LoadingSpinner /> or <LoadingSpinner Size="large" Message="Searching..." />
+*@
+
+<div class="loading-spinner-container">
+    <div class="loading-spinner @SizeClass">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring spinner-ring-delay"></div>
+    </div>
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <p class="loading-spinner-message">@Message</p>
+    }
+</div>

@@ -1,0 +1,303 @@
+@page "/"
+@using HorrorFriday.Web.Shared
+
+<div class="page-enter" style="padding-top: 64px;">
+
+    <AppNavbar OnLoggedOut="HandleLogout" />
+
+    @* ===== HERO ===== *@
+    <div class="hero">
+        <div class="hero-grain"></div>
+        <div class="hero-glow"></div>
+        <div class="hero-content">
+            <div class="hero-heading">
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    <span class="hero-badge-text">Semantic Search</span>
+                </div>
+                <h1 class="hero-title">What kind of dread tonight?</h1>
+                <p class="hero-subtitle">
+                    Describe a mood, a memory, a half-remembered scene. Or filter the catalog the old-fashioned way.
+                </p>
+            </div>
+
+            @* ===== SEARCH CARD ===== *@
+            <div class="search-card">
+
+                @* Search bar *@
+                <div class="search-bar">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                         stroke="@(IsAiMode ? "var(--accent-light)" : "var(--text-muted)")"
+                         stroke-width="2" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                    @* AI MODE toggle button — left side *@
+                    <button class="ai-mode-btn @(IsAiMode ? "ai-mode-btn--active" : "")"
+                            @onclick="ToggleAiMode" type="button">
+                        <span class="ai-mode-dot"></span>
+                        AI
+                    </button>
+                    <input class="search-input"
+                           type="text"
+                           placeholder="@(IsAiMode
+                               ? "Describe what you want to watch — a mood, a feeling, a memory…"
+                               : "Search by title, director, or keyword…")"
+                           @bind="SearchQuery"
+                           @bind:event="oninput"
+                           @onkeydown="HandleSearchKeyDown" />
+                    <button class="search-btn" @onclick="ExecuteSearchFromButton" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <LoadingSpinner Size="small" />
+                        }
+                        else
+                        {
+                            <span>Search</span>
+                        }
+                    </button>
+                </div>
+
+                @* AI hint strip — shows when AI mode is on and no query typed *@
+                @if (IsAiMode && string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    <div class="ai-hint-strip">
+                        <span class="ai-hint-label">Try:</span>
+                        <button class="ai-hint-example" @onclick='() => SearchQuery = "slow burn folk horror set in winter"'>
+                            "slow burn folk horror set in winter"
+                        </button>
+                        <button class="ai-hint-example" @onclick='() => SearchQuery = "something like Hereditary but more cosmic"'>
+                            "something like Hereditary but more cosmic"
+                        </button>
+                        <button class="ai-hint-example" @onclick='() => SearchQuery = "horror movie on an island"'>
+                            "horror movie on an island"
+                        </button>
+                    </div>
+                }
+
+                @* ===== FILTERS ===== *@
+                <div class="hf-filters">
+
+                    @* Genre chips (tri-state) *@
+                    <div class="hf-filters__row">
+                        <div class="hf-filters__field hf-filters__field--grow">
+                            <span class="hf-filters__label">Genre · click to include · click again to exclude</span>
+                            <div class="hf-chip-group">
+                                @foreach (var genre in AllGenres)
+                                {
+                                    var state = GetGenreState(genre);
+                                    var cls = "hf-chip"
+                                        + (state == "included" ? " hf-chip--included" : "")
+                                        + (state == "excluded" ? " hf-chip--excluded" : "");
+
+                                    <button class="@cls" @onclick="() => ToggleGenre(genre)" type="button">
+                                        @if (state == "included")
+                                        {
+                                            <span class="hf-chip__icon">+</span>
+                                        }
+                                        else if (state == "excluded")
+                                        {
+                                            <span class="hf-chip__icon">×</span>
+                                        }
+                                        @genre
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Hide from results (logged-in users only) *@
+                    @if (AuthService.IsLoggedIn)
+                    {
+                        <div class="hf-filters__row hf-filters__row--hide">
+                            <div class="hf-filters__field hf-filters__field--grow">
+                                <span class="hf-filters__label">Hide from results</span>
+                                <div class="hf-chip-group">
+                                    @foreach (var (value, label) in AllStatuses)
+                                    {
+                                        var active = HideStatuses.Contains(value);
+                                        <button class="hf-hide-chip hf-hide-chip--@value @(active ? "hf-hide-chip--active" : "")"
+                                                @onclick="() => ToggleHideStatus(value)" type="button">
+                                            @if (active) { <span class="hf-chip__icon">×</span> }
+                                            @label
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @* Filter actions *@
+                    <div class="hf-filter-actions">
+                        @if (ActiveFilterCount > 0)
+                        {
+                            <span class="hf-active-count">
+                                @ActiveFilterCount filter@(ActiveFilterCount > 1 ? "s" : "") active
+                            </span>
+                            <button type="button" class="hf-clear-btn" @onclick="ClearAllFilters">
+                                Clear filters
+                            </button>
+                        }
+                        <button class="hf-more-toggle @(IsAdvancedOpen ? "hf-more-toggle--open" : "")"
+                                @onclick="ToggleAdvanced" type="button">
+                            @(IsAdvancedOpen ? "Fewer filters" : "More filters")
+                            <span class="hf-more-toggle__caret">▾</span>
+                        </button>
+                    </div>
+
+                    @* Advanced filters — collapsible *@
+                    <div class="hf-advanced @(IsAdvancedOpen ? "hf-advanced--open" : "")">
+                        <div class="hf-filters__divider"></div>
+
+                        <div class="hf-filters__row">
+                            @* Year *@
+                            <div class="hf-filters__field">
+                                <span class="hf-filters__label">Year</span>
+                                <div class="hf-number-pair">
+                                    <input type="text" class="hf-input"
+                                           placeholder="1900" inputmode="numeric"
+                                           maxlength="4" pattern="[0-9]*"
+                                           value="@YearFromText"
+                                           @oninput="e => YearFromText = ClampYearInput(e.Value?.ToString())" />
+                                    <span class="hf-dash">—</span>
+                                    <input type="text" class="hf-input"
+                                           placeholder="2026" inputmode="numeric"
+                                           maxlength="4" pattern="[0-9]*"
+                                           value="@YearToText"
+                                           @oninput="e => YearToText = ClampYearInput(e.Value?.ToString())" />
+                                </div>
+                            </div>
+
+                            @* Rating *@
+                            <div class="hf-filters__field">
+                                <span class="hf-filters__label">Rating (0–10)</span>
+                                <div class="hf-number-pair">
+                                    <input type="text" class="hf-input hf-input--rating"
+                                           placeholder="0" inputmode="decimal"
+                                           maxlength="4"
+                                           value="@MinRatingText"
+                                           @oninput="e => MinRatingText = ClampRatingInput(e.Value?.ToString())" />
+                                    <span class="hf-dash">—</span>
+                                    <input type="text" class="hf-input hf-input--rating"
+                                           placeholder="10" inputmode="decimal"
+                                           maxlength="4"
+                                           value="@MaxRatingText"
+                                           @oninput="e => MaxRatingText = ClampRatingInput(e.Value?.ToString())" />
+                                </div>
+                            </div>
+
+                            @* Max Runtime *@
+                            <div class="hf-filters__field">
+                                <span class="hf-filters__label">Max Runtime</span>
+                                <div style="display: inline-flex; align-items: center;">
+                                    <input type="text" class="hf-input hf-input--runtime"
+                                           placeholder="any" inputmode="numeric"
+                                           maxlength="3" pattern="[0-9]*"
+                                           value="@MaxRuntimeText"
+                                           @oninput="e => MaxRuntimeText = ClampRuntimeInput(e.Value?.ToString())" />
+                                    <span class="hf-suffix">min</span>
+                                </div>
+                            </div>
+
+                            @* Sort *@
+                            <div class="hf-filters__field">
+                                <span class="hf-filters__label">Sort By</span>
+                                <div class="hf-sort-group">
+                                    <CustomSelect TItem="SortOption"
+                                                  Options="SortOptions"
+                                                  TextSelector="o => o.Label"
+                                                  ValueSelector="o => o.Value"
+                                                  @bind-Value="SortBy" />
+                                    <div class="hf-sort-dir" role="group">
+                                        <button type="button"
+                                                class="hf-sort-dir__btn @(SortDirection == "desc" ? "hf-sort-dir__btn--active" : "")"
+                                                @onclick='() => SortDirection = "desc"'>↓</button>
+                                        <button type="button"
+                                                class="hf-sort-dir__btn @(SortDirection == "asc" ? "hf-sort-dir__btn--active" : "")"
+                                                @onclick='() => SortDirection = "asc"'>↑</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Footer *@
+                        <div class="hf-filters__footer">
+                            <div class="hf-filters__footer-left">
+                                <div class="hf-toggle @(IncludeUpcoming ? "hf-toggle--on" : "")"
+                                     @onclick="() => IncludeUpcoming = !IncludeUpcoming">
+                                    <div class="hf-toggle__track">
+                                        <div class="hf-toggle__thumb"></div>
+                                    </div>
+                                    <span class="hf-toggle__label">Include upcoming movies</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ===== RESULTS ===== *@
+    <section class="results-section">
+        @if (IsLoading && Movies is null)
+        {
+            <LoadingSpinner Size="large" Message="Searching..." />
+        }
+        else if (Movies is not null && Movies.Count > 0)
+        {
+            <div class="results-header">
+                <h2 class="results-title">
+                    @if (!string.IsNullOrWhiteSpace(SearchQuery))
+                    {
+                        <span>Results for <em style="color: var(--accent-light);">"@SearchQuery"</em></span>
+                    }
+                    else
+                    {
+                        <span>Filtered catalog</span>
+                    }
+                </h2>
+                <span class="results-count">
+                    @TotalCount.ToString("N0") title@(TotalCount != 1 ? "s" : "")
+                </span>
+            </div>
+
+            <div class="movie-grid">
+                @foreach (var movie in Movies)
+                {
+                    MovieStatuses.TryGetValue(movie.Id, out var currentStatus);
+
+                    <MovieCard Movie="movie"
+                               IsLoggedIn="AuthService.IsLoggedIn"
+                               Status="@currentStatus"
+                               IsStatusPickerOpen="@(OpenStatusPickerId == movie.Id)"
+                               OnNavigate="NavigateToMovie"
+                               OnToggleStatusPicker="ToggleStatusPicker"
+                               OnCloseStatusPicker="CloseStatusPicker"
+                               OnStatusChanged="HandleMovieStatusChanged" />
+
+                }
+            </div>
+
+            @if (TotalPages > 1)
+            {
+                <div class="pagination">
+                    <button class="page-btn" disabled="@(CurrentPage <= 1)" @onclick="PreviousPage">
+                        ‹ Previous
+                    </button>
+                    <span class="page-info">Page @CurrentPage of @TotalPages</span>
+                    <button class="page-btn" disabled="@(CurrentPage >= TotalPages)" @onclick="NextPage">
+                        Next ›
+                    </button>
+                </div>
+            }
+        }
+        else if (Movies is not null && Movies.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">∅</div>
+                <p class="empty-state-text">Nothing matches your search.</p>
+            </div>
+        }
+    </section>
+</div>
