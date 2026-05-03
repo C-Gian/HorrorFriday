@@ -4,7 +4,10 @@
       "Bash(dotnet add *)",
       "Bash(dotnet build *)",
       "Bash(dotnet user-secrets *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(python -c \"import sys; parts=sys.stdin.read\\(\\).strip\\(\\).split\\(','\\); [print\\(f'{i}: {p}'\\) for i,p in enumerate\\(parts\\)]\")"
     ]
   }
 }

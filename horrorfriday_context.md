@@ -4,7 +4,7 @@
 > When the user says **"aggiorna il file .md"** or something similar, update this file in place — never duplicate.
 > If a feature moves from TODO → DONE, move it. If a file is renamed, rename it here, in general never duplicate something already here, just update it if it exists.
 > Keep detail level moderate: enough context to code correctly, not a line-by-line log.
-
+> if we did something that would required an edit of readme or it would be cool to be in the readme, edit it and update it!
 ---
 
 ## Overview
@@ -31,6 +31,7 @@ HorrorFriday is a horror/dark movie discovery web app with semantic AI search, u
 
 ```
 HorrorFriday.Importer   → DO NOT MODIFY (Kaggle import, done)
+HorrorFriday.TmdbSync   → TMDB daily sync tool (console, manually triggered)
 HorrorFriday.API        → Backend
 HorrorFriday.Web        → Frontend Blazor WASM
 migrations/             → Raw SQL migration files (run manually)
@@ -61,6 +62,17 @@ migrations/             → Raw SQL migration files (run manually)
 
 **password_reset_tokens** — id, user_id, token_hash (SHA-256 hex), expires_at (1h), used_at, created_at
 - Migration: `migrations/001_password_reset_tokens.sql` — **must be run manually**
+
+**watch_providers** — id, tmdb_provider_id (UNIQUE), provider_name, logo_path
+
+**movie_watch_providers** — movie_id, provider_id, region, provider_type ('stream'|'rent'|'buy'|'ads') — PK on all four
+
+**movie_certifications** — movie_id, region, certification — PK on (movie_id, region)
+
+**tmdb_sync_log** — audit log of every sync run (type, started_at, finished_at, counts, errors)
+
+- Migration: `migrations/002_tmdb_sync_tables.sql` — **must be run manually before first TmdbSync run**
+- Also adds `media_type` column to `movies` and changes unique constraint to `(tmdb_id, media_type)`
 
 ---
 
@@ -137,6 +149,15 @@ migrations/             → Raw SQL migration files (run manually)
 ## Key Files
 
 ```
+TmdbSync (HorrorFriday.TmdbSync/):
+  Program.cs                          → menu, config load, startup checks
+  Models/TmdbModels.cs                → TMDB API response DTOs + SyncSettings + SyncStats
+  Services/TmdbApiService.cs          → rate-limited TMDB HTTP client (250ms/req default)
+  Services/SyncDatabaseService.cs     → all DB ops (insert, upsert certs/providers, backfill query)
+  Services/SyncOrchestrator.cs        → 4 sync modes orchestration with progress display
+  appsettings.json                    → non-secret config (delay, genres, regions, lookback)
+  .env (gitignored)                   → HF_DB + TMDB_API_KEY secrets
+
 API:
   Controllers/AuthController.cs          → register, login, refresh, google
   Controllers/AccountController.cs       → change-password, change-email, change-username, forgot/reset-password
@@ -166,7 +187,7 @@ Web:
 
 ## TODO — Technical (pre-deploy & improvements)
 
-- [ ] **TMDB bulk import**: Rewrite/extend `HorrorFriday.Importer` to pull from TMDB API, import only movies not already in DB (by tmdb_id), with embeddings. Must handle 100k+ on first run, then run daily for incremental updates.
+- [x] **TMDB bulk import**: `HorrorFriday.TmdbSync` — console tool with 4 modes (full sync, daily delta, backfill only, discover only). Inserts delta only (by tmdb_id+media_type). Handles movies + TV series. Adds certifications, watch providers. NO embeddings (no OpenAI cost). Self-resumable backfill.
 - [ ] **Remove poster_path TMDB dependency**: `poster_path` in movies table points to `image.tmdb.org`. Before commercializing: download all posters to own CDN/storage and update column to own URLs. OR generate poster URLs dynamically from a self-hosted mirror.
 - [ ] **Email verification on registration**: Send confirmation email; block login until verified.
 - [ ] **Account deletion**: `DELETE /api/account` endpoint, removes all user data within 30 days (GDPR Art. 17).
