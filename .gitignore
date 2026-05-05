@@ -21,3 +21,5 @@ HorrorFriday.Web/wwwroot/appsettings.json
 
 # Ignora solo la data dell'importer
 HorrorFriday.Importer/data/
+HorrorFriday.TmdbImporter/Data/
+HorrorFriday.TmdbImporter/data/
