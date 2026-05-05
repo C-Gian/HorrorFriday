@@ -1,6 +1,6 @@
 <Solution>
   <Project Path="HorrorFriday.API/HorrorFriday.API.csproj" Id="96709d26-471a-4c27-a623-0648a928436f" />
-  <Project Path="HorrorFriday.Importer/HorrorFriday.Importer.csproj" />
-  <Project Path="HorrorFriday.TmdbSync/HorrorFriday.TmdbSync.csproj" />
+  <Project Path="HorrorFriday.CsvImporter/HorrorFriday.CsvImporter.csproj" />
+  <Project Path="HorrorFriday.TmdbImporter/HorrorFriday.TmdbImporter.csproj" />
   <Project Path="HorrorFriday.Web/HorrorFriday.Web.csproj" Id="e789cbb0-96a6-46f7-a2e5-2b50d9a994f3" />
 </Solution>

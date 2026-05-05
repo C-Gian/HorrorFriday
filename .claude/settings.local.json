@@ -7,7 +7,11 @@
       "Bash(git check-ignore *)",
       "Bash(Get-ChildItem -Recurse -Directory)",
       "Bash(Select-Object FullName)",
-      "Bash(python -c \"import sys; parts=sys.stdin.read\\(\\).strip\\(\\).split\\(','\\); [print\\(f'{i}: {p}'\\) for i,p in enumerate\\(parts\\)]\")"
+      "Bash(python -c \"import sys; parts=sys.stdin.read\\(\\).strip\\(\\).split\\(','\\); [print\\(f'{i}: {p}'\\) for i,p in enumerate\\(parts\\)]\")",
+      "PowerShell(Get-ChildItem -Recurse \"C:\\\\Users\\\\Gian\\\\source\\\\repos\\\\C-Gian\\\\HorrorFriday\\\\HorrorFriday.CsvImporter\" | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Recurse \"C:\\\\Users\\\\Gian\\\\source\\\\repos\\\\C-Gian\\\\HorrorFriday\\\\HorrorFriday.TmdbImporter\" | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(dotnet build *)",
+      "Bash(Select-String -Pattern \"\\\\.env|env\")"
     ]
   }
 }
