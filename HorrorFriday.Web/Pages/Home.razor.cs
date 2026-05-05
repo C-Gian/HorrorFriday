@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HorrorFriday.Web.Models;
@@ -15,6 +16,7 @@ public partial class Home : ComponentBase
     [Inject] private HttpClient Http { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private AuthService AuthService { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     // ─────────────── UI state ───────────────
 
@@ -30,6 +32,84 @@ public partial class Home : ComponentBase
     protected List<string> AllGenres { get; set; } = new();
     protected HashSet<string> IncludedGenres { get; set; } = new();
     protected HashSet<string> ExcludedGenres { get; set; } = new();
+
+    // ─────────────── Media type filter ───────────────
+
+    protected string MediaType { get; set; } = "all";
+
+    // ─────────────── Region / Provider / Certification filters ───────────────
+
+    protected string? SelectedRegion { get; set; }
+    protected List<string> AllRegions { get; set; } = new();
+    protected List<ProviderDto> AllProviders { get; set; } = new();
+    protected List<string> AllCertifications { get; set; } = new();
+    protected HashSet<int> SelectedProviderIds { get; set; } = new();
+    protected HashSet<string> SelectedCertifications { get; set; } = new();
+
+    protected IEnumerable<RegionOption> RegionOptions =>
+        new[] { new RegionOption("", "Any country") }
+        .Concat(AllRegions.Select(r => new RegionOption(r, GetRegionLabel(r))));
+
+    protected string GetRegionLabel(string code) =>
+        RegionNames.TryGetValue(code, out var name) ? $"{name} ({code})" : code;
+
+    protected string? GetRegionName(string code) =>
+        RegionNames.TryGetValue(code, out var name) ? name : code;
+
+    public record RegionOption(string Value, string Label);
+
+    private static readonly Dictionary<string, string> RegionNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AD"] = "Andorra", ["AE"] = "UAE", ["AG"] = "Antigua & Barbuda",
+        ["AL"] = "Albania", ["AO"] = "Angola", ["AR"] = "Argentina",
+        ["AT"] = "Austria", ["AU"] = "Australia", ["AZ"] = "Azerbaijan",
+        ["BA"] = "Bosnia & Herzegovina", ["BB"] = "Barbados", ["BE"] = "Belgium",
+        ["BF"] = "Burkina Faso", ["BG"] = "Bulgaria", ["BH"] = "Bahrain",
+        ["BJ"] = "Benin", ["BO"] = "Bolivia", ["BR"] = "Brazil",
+        ["BS"] = "Bahamas", ["BT"] = "Bhutan", ["BW"] = "Botswana",
+        ["BY"] = "Belarus", ["BZ"] = "Belize", ["CA"] = "Canada",
+        ["CD"] = "Congo (DRC)", ["CH"] = "Switzerland", ["CI"] = "Côte d'Ivoire",
+        ["CL"] = "Chile", ["CM"] = "Cameroon", ["CO"] = "Colombia",
+        ["CR"] = "Costa Rica", ["CV"] = "Cape Verde", ["CY"] = "Cyprus",
+        ["CZ"] = "Czech Republic", ["DE"] = "Germany", ["DK"] = "Denmark",
+        ["DO"] = "Dominican Republic", ["DZ"] = "Algeria", ["EC"] = "Ecuador",
+        ["EE"] = "Estonia", ["EG"] = "Egypt", ["ES"] = "Spain",
+        ["ET"] = "Ethiopia", ["FI"] = "Finland", ["FJ"] = "Fiji",
+        ["FR"] = "France", ["GA"] = "Gabon", ["GB"] = "United Kingdom",
+        ["GH"] = "Ghana", ["GM"] = "Gambia", ["GQ"] = "Equatorial Guinea",
+        ["GR"] = "Greece", ["GT"] = "Guatemala", ["GW"] = "Guinea-Bissau",
+        ["GY"] = "Guyana", ["HK"] = "Hong Kong", ["HN"] = "Honduras",
+        ["HR"] = "Croatia", ["HU"] = "Hungary", ["ID"] = "Indonesia",
+        ["IE"] = "Ireland", ["IL"] = "Israel", ["IN"] = "India",
+        ["IQ"] = "Iraq", ["IS"] = "Iceland", ["IT"] = "Italy",
+        ["JM"] = "Jamaica", ["JO"] = "Jordan", ["JP"] = "Japan",
+        ["KE"] = "Kenya", ["KR"] = "South Korea", ["KW"] = "Kuwait",
+        ["LB"] = "Lebanon", ["LC"] = "Saint Lucia", ["LI"] = "Liechtenstein",
+        ["LT"] = "Lithuania", ["LU"] = "Luxembourg", ["LV"] = "Latvia",
+        ["LY"] = "Libya", ["MA"] = "Morocco", ["MC"] = "Monaco",
+        ["MD"] = "Moldova", ["ME"] = "Montenegro", ["MG"] = "Madagascar",
+        ["MK"] = "North Macedonia", ["ML"] = "Mali", ["MT"] = "Malta",
+        ["MU"] = "Mauritius", ["MW"] = "Malawi", ["MX"] = "Mexico",
+        ["MY"] = "Malaysia", ["MZ"] = "Mozambique", ["NA"] = "Namibia",
+        ["NE"] = "Niger", ["NG"] = "Nigeria", ["NI"] = "Nicaragua",
+        ["NL"] = "Netherlands", ["NO"] = "Norway", ["NP"] = "Nepal",
+        ["NZ"] = "New Zealand", ["OM"] = "Oman", ["PA"] = "Panama",
+        ["PE"] = "Peru", ["PH"] = "Philippines", ["PK"] = "Pakistan",
+        ["PL"] = "Poland", ["PS"] = "Palestine", ["PT"] = "Portugal",
+        ["PW"] = "Palau", ["PY"] = "Paraguay", ["QA"] = "Qatar",
+        ["RO"] = "Romania", ["RS"] = "Serbia", ["RU"] = "Russia",
+        ["RW"] = "Rwanda", ["SA"] = "Saudi Arabia", ["SC"] = "Seychelles",
+        ["SE"] = "Sweden", ["SG"] = "Singapore", ["SI"] = "Slovenia",
+        ["SK"] = "Slovakia", ["SL"] = "Sierra Leone", ["SM"] = "San Marino",
+        ["SN"] = "Senegal", ["SV"] = "El Salvador", ["TD"] = "Chad",
+        ["TH"] = "Thailand", ["TJ"] = "Tajikistan", ["TL"] = "Timor-Leste",
+        ["TN"] = "Tunisia", ["TR"] = "Turkey", ["TT"] = "Trinidad & Tobago",
+        ["TW"] = "Taiwan", ["TZ"] = "Tanzania", ["UA"] = "Ukraine",
+        ["UG"] = "Uganda", ["US"] = "United States", ["UY"] = "Uruguay",
+        ["UZ"] = "Uzbekistan", ["VA"] = "Vatican City", ["VC"] = "St. Vincent",
+        ["VE"] = "Venezuela", ["XK"] = "Kosovo", ["YE"] = "Yemen",
+        ["ZA"] = "South Africa", ["ZM"] = "Zambia", ["ZW"] = "Zimbabwe",
+    };
 
     // ─────────────── Advanced filter state ───────────────
 
@@ -98,7 +178,11 @@ public partial class Home : ComponentBase
         + (!string.IsNullOrEmpty(Language) ? 1 : 0)
         + (SortBy != DefaultSortBy || SortDirection != DefaultSortDirection ? 1 : 0)
         + (IncludeUpcoming ? 1 : 0)
-        + HideStatuses.Count;
+        + HideStatuses.Count
+        + (MediaType != "all" ? 1 : 0)
+        + (!string.IsNullOrEmpty(SelectedRegion) ? 1 : 0)
+        + SelectedProviderIds.Count
+        + SelectedCertifications.Count;
 
     // ─────────────── Parsed values (with validation) ───────────────
 
@@ -113,8 +197,23 @@ public partial class Home : ComponentBase
     protected override async Task OnInitializedAsync()
     {
         await AuthService.InitializeAsync();
-        await LoadGenres();
+        await Task.WhenAll(LoadGenres(), LoadRegions(), LoadProviders());
+        await TryPreSelectRegionFromBrowserAsync();
         await ExecuteSearch();
+    }
+
+    private async Task TryPreSelectRegionFromBrowserAsync()
+    {
+        try
+        {
+            var code = await JS.InvokeAsync<string>("getBrowserRegion");
+            if (!string.IsNullOrEmpty(code) && AllRegions.Contains(code, StringComparer.OrdinalIgnoreCase))
+            {
+                SelectedRegion = code.ToUpperInvariant();
+                await Task.WhenAll(LoadProviders(), LoadCertifications());
+            }
+        }
+        catch { }
     }
 
     // ─────────────── Data loading ───────────────
@@ -130,6 +229,57 @@ public partial class Home : ComponentBase
         catch (Exception ex)
         {
             Console.WriteLine($"[Home] Failed to load genres: {ex.Message}");
+        }
+    }
+
+    private async Task LoadRegions()
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<string>>("api/movies/regions");
+            if (result is not null)
+                AllRegions = result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Failed to load regions: {ex.Message}");
+        }
+    }
+
+    private async Task LoadProviders()
+    {
+        try
+        {
+            var url = string.IsNullOrEmpty(SelectedRegion)
+                ? "api/movies/providers"
+                : $"api/movies/providers?region={Uri.EscapeDataString(SelectedRegion)}";
+            var result = await Http.GetFromJsonAsync<List<ProviderDto>>(url);
+            if (result is not null)
+                AllProviders = result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Failed to load providers: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCertifications()
+    {
+        if (string.IsNullOrEmpty(SelectedRegion))
+        {
+            AllCertifications.Clear();
+            return;
+        }
+        try
+        {
+            var url = $"api/movies/certifications?region={Uri.EscapeDataString(SelectedRegion)}";
+            var result = await Http.GetFromJsonAsync<List<string>>(url);
+            if (result is not null)
+                AllCertifications = result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Failed to load certifications: {ex.Message}");
         }
     }
 
@@ -163,7 +313,11 @@ public partial class Home : ComponentBase
                 Page = CurrentPage,
                 PageSize = PageSize,
                 HideStatuses = AuthService.IsLoggedIn && HideStatuses.Count > 0
-                    ? HideStatuses.ToList() : null
+                    ? HideStatuses.ToList() : null,
+                MediaType = MediaType != "all" ? MediaType : null,
+                Region = SelectedRegion,
+                Certifications = SelectedCertifications.Count > 0 ? SelectedCertifications.ToList() : null,
+                ProviderIds = SelectedProviderIds.Count > 0 ? SelectedProviderIds.ToList() : null
             };
 
             // Send auth header so the backend can apply the hide-statuses filter
@@ -323,6 +477,43 @@ public partial class Home : ComponentBase
         await ExecuteSearch();
     }
 
+    protected async Task SetMediaType(string type)
+    {
+        MediaType = type;
+        CurrentPage = 1;
+        await ExecuteSearch();
+    }
+
+    protected async Task OnRegionChangedAsync(string value)
+    {
+        SelectedRegion = string.IsNullOrEmpty(value) ? null : value;
+        SelectedProviderIds.Clear();
+        SelectedCertifications.Clear();
+        await Task.WhenAll(LoadProviders(), LoadCertifications());
+        CurrentPage = 1;
+        await ExecuteSearch();
+    }
+
+    protected async Task ToggleProvider(int providerId)
+    {
+        if (SelectedProviderIds.Contains(providerId))
+            SelectedProviderIds.Remove(providerId);
+        else
+            SelectedProviderIds.Add(providerId);
+        CurrentPage = 1;
+        await ExecuteSearch();
+    }
+
+    protected async Task ToggleCertification(string cert)
+    {
+        if (SelectedCertifications.Contains(cert))
+            SelectedCertifications.Remove(cert);
+        else
+            SelectedCertifications.Add(cert);
+        CurrentPage = 1;
+        await ExecuteSearch();
+    }
+
     // ─────────────── Input clamping (prevents invalid input) ───────────────
 
     protected static string ClampYearInput(string? raw)
@@ -441,6 +632,12 @@ public partial class Home : ComponentBase
         SortBy = DefaultSortBy;
         SortDirection = DefaultSortDirection;
         IncludeUpcoming = false;
+        MediaType = "all";
+        SelectedRegion = null;
+        SelectedProviderIds.Clear();
+        SelectedCertifications.Clear();
+        AllCertifications.Clear();
+        await LoadProviders();
         CurrentPage = 1;
         await ExecuteSearch();
     }
@@ -504,6 +701,10 @@ public partial class Home : ComponentBase
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
         public List<string>? HideStatuses { get; set; }
+        public string? MediaType { get; set; }
+        public string? Region { get; set; }
+        public List<string>? Certifications { get; set; }
+        public List<int>? ProviderIds { get; set; }
     }
 
     public class PagedResult<T>

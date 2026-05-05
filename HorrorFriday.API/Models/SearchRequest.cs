@@ -88,4 +88,24 @@ public class SearchRequest
     /// Populated by the frontend; the controller attaches the userId from JWT.
     /// </summary>
     public List<string>? HideStatuses { get; set; }
+
+    /// <summary>
+    /// Filter by media type: "movie", "tv", or null for both.
+    /// </summary>
+    public string? MediaType { get; set; }
+
+    /// <summary>
+    /// ISO 3166-1 region code (e.g. "IT", "US"). Used together with Certifications and ProviderIds.
+    /// </summary>
+    public string? Region { get; set; }
+
+    /// <summary>
+    /// Filter by age certification codes (e.g. ["R", "PG-13"]). Region must be set.
+    /// </summary>
+    public List<string>? Certifications { get; set; }
+
+    /// <summary>
+    /// Filter to titles available on these watch provider IDs. Optionally scoped to Region.
+    /// </summary>
+    public List<int>? ProviderIds { get; set; }
 }

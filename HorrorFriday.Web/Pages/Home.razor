@@ -78,6 +78,24 @@
                 @* ===== FILTERS ===== *@
                 <div class="hf-filters">
 
+                    @* Media type toggle *@
+                    <div class="hf-filters__row">
+                        <div class="hf-filters__field">
+                            <span class="hf-filters__label">Content type</span>
+                            <div class="hf-media-type-group">
+                                <button type="button"
+                                        class="hf-media-type-btn @(MediaType == "all" ? "hf-media-type-btn--active" : "")"
+                                        @onclick='() => SetMediaType("all")'>All</button>
+                                <button type="button"
+                                        class="hf-media-type-btn @(MediaType == "movie" ? "hf-media-type-btn--active" : "")"
+                                        @onclick='() => SetMediaType("movie")'>Movies</button>
+                                <button type="button"
+                                        class="hf-media-type-btn @(MediaType == "tv" ? "hf-media-type-btn--active" : "")"
+                                        @onclick='() => SetMediaType("tv")'>TV Series</button>
+                            </div>
+                        </div>
+                    </div>
+
                     @* Genre chips (tri-state) *@
                     <div class="hf-filters__row">
                         <div class="hf-filters__field hf-filters__field--grow">
@@ -218,6 +236,79 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        @* ── Availability section (region + providers + certifications) ── *@
+                        <div class="hf-availability">
+                            <div class="hf-availability__header">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                </svg>
+                                <span>Availability</span>
+                                <span class="hf-availability__hint">
+                                    @if (!string.IsNullOrEmpty(SelectedRegion))
+                                    {
+                                        <text>· @GetRegionName(SelectedRegion)</text>
+                                    }
+                                    else
+                                    {
+                                        <text>· select a country to filter by providers &amp; rating</text>
+                                    }
+                                </span>
+                            </div>
+
+                            <div class="hf-filters__field">
+                                <span class="hf-filters__label">Country</span>
+                                <SearchableSelect TItem="RegionOption"
+                                                  Options="RegionOptions.ToList()"
+                                                  TextSelector="o => o.Label"
+                                                  ValueSelector="o => o.Value"
+                                                  Value="@(SelectedRegion ?? "")"
+                                                  ValueChanged="OnRegionChangedAsync"
+                                                  Placeholder="Any country" />
+                            </div>
+
+                            @if (AllProviders.Count > 0)
+                            {
+                                <div class="hf-filters__field hf-filters__field--grow">
+                                    <span class="hf-filters__label">Available on</span>
+                                    <div class="hf-chip-group">
+                                        @foreach (var provider in AllProviders)
+                                        {
+                                            var active = SelectedProviderIds.Contains(provider.Id);
+                                            <button class="hf-chip hf-provider-chip @(active ? "hf-chip--included" : "")"
+                                                    @onclick="() => ToggleProvider(provider.Id)" type="button">
+                                                @if (!string.IsNullOrEmpty(provider.LogoPath))
+                                                {
+                                                    <img src="https://image.tmdb.org/t/p/w45@(provider.LogoPath)"
+                                                         alt="" class="hf-provider-chip__logo" />
+                                                }
+                                                @provider.Name
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @if (AllCertifications.Count > 0)
+                            {
+                                <div class="hf-filters__field hf-filters__field--grow">
+                                    <span class="hf-filters__label">Age rating</span>
+                                    <div class="hf-chip-group">
+                                        @foreach (var cert in AllCertifications)
+                                        {
+                                            var active = SelectedCertifications.Contains(cert);
+                                            <button class="hf-chip @(active ? "hf-chip--included" : "")"
+                                                    @onclick="() => ToggleCertification(cert)" type="button">
+                                                @if (active) { <span class="hf-chip__icon">+</span> }
+                                                @cert
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
                         </div>
 
                         @* Footer *@

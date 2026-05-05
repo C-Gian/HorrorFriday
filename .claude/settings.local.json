@@ -12,7 +12,11 @@
       "PowerShell(Get-ChildItem -Recurse \"C:\\\\Users\\\\Gian\\\\source\\\\repos\\\\C-Gian\\\\HorrorFriday\\\\HorrorFriday.TmdbImporter\" | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
       "PowerShell(dotnet build *)",
       "Bash(Select-String -Pattern \"\\\\.env|env\")",
-      "Bash(Test-Path *)"
+      "Bash(Test-Path *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Gian\\\\source\\\\repos\\\\C-Gian\\\\HorrorFriday\" -Recurse -Filter \"*.csproj\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(xargs grep -l \"CREATE TABLE\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Gian\\\\source\\\\repos\\\\C-Gian\\\\HorrorFriday\" -Recurse -Directory)"
     ]
   }
 }

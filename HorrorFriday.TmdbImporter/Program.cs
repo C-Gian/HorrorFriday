@@ -49,9 +49,9 @@ while (true)
         return;
     }
 
-    if (key is not '1' and not '2' and not '3' and not '4' and not '5' and not '6')
+    if (key is not '1' and not '2' and not '3' and not '4' and not '5' and not '6' and not '7')
     {
-        Console.WriteLine("  Opzione non valida. Premi 1–6 o Q.\n");
+        Console.WriteLine("  Opzione non valida. Premi 1–7 o Q.\n");
         continue;
     }
 
@@ -74,7 +74,7 @@ while (true)
         }
     }
 
-    if (tmdbService == null)
+    if (key != '7' && tmdbService == null)
     {
         if (string.IsNullOrEmpty(tmdbApiKey)) { PrintError("TMDB_API_KEY non impostato."); continue; }
         Console.Write("Verifica API key TMDB... ");
@@ -248,6 +248,50 @@ e copialo in quella cartella (formato .json.gz o .json estratto).
             stats = await tvDumpImporter!.RunAsync(tvDumpFile, cts.Token);
             break;
         }
+
+        case '7':
+        {
+            var openAiKey = Environment.GetEnvironmentVariable("HF_OPENAI_KEY") ?? "";
+            if (string.IsNullOrEmpty(openAiKey))
+            {
+                PrintError("HF_OPENAI_KEY non impostato nel file .env.");
+                break;
+            }
+
+            var pending = 0L;
+            try
+            {
+                await using var tmpDs = Npgsql.NpgsqlDataSource.Create(connectionString);
+                await using var tmpConn = await tmpDs.OpenConnectionAsync();
+                await using var tmpCmd = new Npgsql.NpgsqlCommand(
+                    "SELECT COUNT(*) FROM movies WHERE embedding IS NULL", tmpConn);
+                pending = (long)(await tmpCmd.ExecuteScalarAsync() ?? 0L);
+            }
+            catch { }
+
+            var estCost = pending * 100.0 / 1_000_000.0 * 0.02;
+
+            Console.WriteLine($"""
+
+  ┌─ Embedding Backfill ──────────────────────────────────────────────────────┐
+  │ Genera embedding OpenAI per tutti i record senza (embedding IS NULL).     │
+  │ Usa text-embedding-3-small (1536 dim) e salva direttamente nel DB.        │
+  │ Auto-riprendibile: ogni batch è persistito prima del prossimo.            │
+  │                                                                            │
+  │  Record da processare  : {pending,8:N0}                                       │
+  │  Stima costo OpenAI    : ~${estCost:F2}  (text-embedding-3-small $0.02/1M tok) │
+  │  Batch size            : {settings.EmbeddingBatchSize,8:N0}                                       │
+  └────────────────────────────────────────────────────────────────────────────┘
+
+""");
+            Console.Write("  Confermi? [S/N] ");
+            if (char.ToUpper(Console.ReadKey(intercept: true).KeyChar) != 'S') { Console.WriteLine("\n  Annullato.\n"); break; }
+            Console.WriteLine("\n");
+
+            using var backfill = new EmbeddingBackfillService(connectionString, openAiKey, settings.EmbeddingBatchSize);
+            stats = await backfill.RunAsync(cts.Token);
+            break;
+        }
     }
 
     Console.CancelKeyPress -= cancelHandler;
@@ -289,10 +333,13 @@ static void PrintMenu()
 │       (~230k voci, filtro popularity, riprendibile)                      │
 │       ⚠  Richiede migrazione 006 e dump in Data/                        │
 │                                                                          │
+│  [7]  Embedding Backfill — genera embedding per record senza (post-dump) │
+│       (auto-riprendibile, richiede HF_OPENAI_KEY nel .env)               │
+│                                                                          │
 │  [Q]  Esci                                                               │
 └──────────────────────────────────────────────────────────────────────────┘
 """);
-    Console.Write("  Scelta [1-6/Q]: ");
+    Console.Write("  Scelta [1-7/Q]: ");
 }
 
 static void PrintSummary(SyncStats s, TimeSpan elapsed)

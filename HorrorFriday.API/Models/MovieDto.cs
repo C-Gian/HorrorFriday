@@ -25,4 +25,5 @@ public class MovieDto
     public string? ImdbId { get; set; }
     public List<string> Genres { get; set; } = new();
     public List<string> Keywords { get; set; } = new();
+    public string? MediaType { get; set; }
 }

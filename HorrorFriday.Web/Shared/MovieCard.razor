@@ -1,6 +1,6 @@
 @using HorrorFriday.Web.Models
 
-<div class="poster-card" @onclick="HandleNavigate" @onmouseleave="HandleMouseLeave">
+<div class="poster-card poster-card--@(Movie.MediaType == "tv" ? "tv" : "movie")" @onclick="HandleNavigate" @onmouseleave="HandleMouseLeave">
     @if (!string.IsNullOrEmpty(Movie.PosterPath))
     {
         <img class="poster-img"
@@ -39,6 +39,11 @@
         <div class="poster-rating">
             &#9733; @Movie.VoteAverage.Value.ToString("0.0")
         </div>
+    }
+
+    @if (Movie.MediaType == "tv")
+    {
+        <div class="poster-type-badge">SERIES</div>
     }
 
     <div class="poster-hover-overlay">

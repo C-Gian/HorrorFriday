@@ -286,4 +286,7 @@ public class SyncSettings
     public int DumpCheckpointEvery { get; set; } = 100;
     public int DumpParallelism { get; set; } = 15;
     public int DumpMaxRequestsPerSecond { get; set; } = 15;
+
+    // Mode [7] embedding backfill
+    public int EmbeddingBatchSize { get; set; } = 100;
 }

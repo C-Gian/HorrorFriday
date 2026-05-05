@@ -1,3 +1,13 @@
+window.getBrowserRegion = function () {
+    var lang = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    var parts = lang.split('-');
+    return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
+};
+
+window.focusElement = function (el) {
+    if (el) el.focus();
+};
+
 let _menuCloseHandler = null;
 
 window.userMenu = {

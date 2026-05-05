@@ -1,0 +1,45 @@
+@typeparam TItem
+
+<div class="hf-ss @(IsOpen ? "hf-ss--open" : "")">
+    <button type="button"
+            class="hf-ss__trigger"
+            @onclick="Toggle"
+            @onclick:stopPropagation>
+        <span class="hf-ss__trigger-text">@GetSelectedText()</span>
+        <span class="hf-ss__caret">▾</span>
+    </button>
+
+    @if (IsOpen)
+    {
+        <div class="hf-ss__backdrop" @onclick="Close" @onclick:stopPropagation></div>
+        <div class="hf-ss__dropdown">
+            <div class="hf-ss__search-wrap">
+                <input type="text"
+                       class="hf-ss__search"
+                       placeholder="Search…"
+                       @bind="SearchText"
+                       @bind:event="oninput"
+                       @ref="SearchInput"
+                       @onclick:stopPropagation />
+            </div>
+            <div class="hf-ss__list">
+                @foreach (var option in FilteredOptions)
+                {
+                    var val = ValueSelector(option);
+                    var text = TextSelector(option);
+                    var isSelected = val == Value;
+                    <button type="button"
+                            class="hf-ss__option @(isSelected ? "hf-ss__option--selected" : "")"
+                            @onclick="() => SelectOption(val)"
+                            @onclick:stopPropagation>
+                        @text
+                    </button>
+                }
+                @if (!FilteredOptions.Any())
+                {
+                    <span class="hf-ss__empty">No results</span>
+                }
+            </div>
+        </div>
+    }
+</div>

@@ -43,4 +43,27 @@ public class MoviesController : ControllerBase
         var genres = await _movieService.GetAllGenresAsync();
         return Ok(genres);
     }
+
+    [HttpGet("regions")]
+    public async Task<ActionResult<List<string>>> GetRegions()
+    {
+        var regions = await _movieService.GetRegionsAsync();
+        return Ok(regions);
+    }
+
+    [HttpGet("providers")]
+    public async Task<ActionResult<List<ProviderDto>>> GetProviders([FromQuery] string? region)
+    {
+        var providers = await _movieService.GetProvidersAsync(region);
+        return Ok(providers);
+    }
+
+    [HttpGet("certifications")]
+    public async Task<ActionResult<List<string>>> GetCertifications([FromQuery] string region)
+    {
+        if (string.IsNullOrWhiteSpace(region))
+            return BadRequest("region is required");
+        var certs = await _movieService.GetCertificationsAsync(region);
+        return Ok(certs);
+    }
 }

@@ -153,6 +153,61 @@ public class MovieService
             paramIndex++;
         }
 
+        // Media type (movie / tv)
+        if (!string.IsNullOrWhiteSpace(request.MediaType))
+        {
+            conditions.Add($"m.media_type = ${paramIndex}");
+            parameters.Add(new NpgsqlParameter { Value = request.MediaType });
+            paramIndex++;
+        }
+
+        // Certifications (region required)
+        if (!string.IsNullOrWhiteSpace(request.Region) && request.Certifications?.Count > 0)
+        {
+            var certPlaceholders = new List<string>();
+            foreach (var cert in request.Certifications)
+            {
+                certPlaceholders.Add($"${paramIndex}");
+                parameters.Add(new NpgsqlParameter { Value = cert });
+                paramIndex++;
+            }
+            conditions.Add($@"m.id IN (
+                SELECT movie_id FROM movie_certifications
+                WHERE region = ${paramIndex} AND certification IN ({string.Join(", ", certPlaceholders)})
+            )");
+            parameters.Add(new NpgsqlParameter { Value = request.Region });
+            paramIndex++;
+        }
+
+        // Watch providers
+        if (request.ProviderIds?.Count > 0)
+        {
+            var providerPlaceholders = new List<string>();
+            foreach (var pid in request.ProviderIds)
+            {
+                providerPlaceholders.Add($"${paramIndex}");
+                parameters.Add(new NpgsqlParameter { Value = pid });
+                paramIndex++;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Region))
+            {
+                conditions.Add($@"m.id IN (
+                    SELECT movie_id FROM movie_watch_providers
+                    WHERE provider_id IN ({string.Join(", ", providerPlaceholders)}) AND region = ${paramIndex}
+                )");
+                parameters.Add(new NpgsqlParameter { Value = request.Region });
+                paramIndex++;
+            }
+            else
+            {
+                conditions.Add($@"m.id IN (
+                    SELECT movie_id FROM movie_watch_providers
+                    WHERE provider_id IN ({string.Join(", ", providerPlaceholders)})
+                )");
+            }
+        }
+
         // --- Semantic embedding ---
         // Resolved here so all filter conditions are already in the list.
         // The embedding goes into ORDER BY only (not WHERE), so it is NOT
@@ -210,7 +265,7 @@ public class MovieService
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
                    m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id
+                   m.poster_path, m.imdb_id, m.media_type
             FROM movies m
             {whereClause}
             {orderClause}
@@ -259,7 +314,7 @@ public class MovieService
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
                    m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id,
+                   m.poster_path, m.imdb_id, m.media_type,
                    m.embedding <=> $1 AS distance
             FROM movies m
             WHERE m.embedding IS NOT NULL
@@ -299,7 +354,7 @@ public class MovieService
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
                    m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id
+                   m.poster_path, m.imdb_id, m.media_type
             FROM movies m
             WHERE m.id = $1";
 
@@ -323,6 +378,164 @@ public class MovieService
         }
 
         return movie;
+    }
+
+    public async Task<List<string>> GetRegionsAsync()
+    {
+        var regions = new List<string>();
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT DISTINCT region FROM movie_watch_providers ORDER BY region", conn);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            regions.Add(reader.GetString(0));
+        return regions;
+    }
+
+    // Exact provider names as used by TMDB. Case-insensitive match.
+    private static readonly HashSet<string> MajorProviderNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Netflix",
+        "Amazon Prime Video", "Amazon Video",
+        "Disney+", "Disney Plus",
+        "Max", "HBO Max",
+        "Apple TV+", "Apple TV Plus", "Apple TV",
+        "Paramount+", "Paramount Plus",
+        "Hulu",
+        "Peacock", "Peacock Premium",
+        "YouTube", "YouTube Premium",
+        "Google TV", "Google Play Movies",
+        "Pluto TV",
+        "Tubi TV", "Tubi",
+        "Amazon Freevee", "Freevee",
+        "Crunchyroll",
+        "DAZN",
+        "Tencent Video",
+        "iQIYI",
+        "Hotstar", "Disney+ Hotstar",
+        "Sky Go", "Sky",
+        "NOW", "NOW TV",
+        "Showtime",
+        "Canal+",
+        "MUBI",
+        "fuboTV",
+        "Shudder",
+        "BritBox",
+        "discovery+", "Discovery+",
+        "ESPN+",
+        "Starz",
+        "MGM+",
+        "Rai Play",
+        "TIMvision",
+        "Infinity+",
+    };
+
+    public async Task<List<ProviderDto>> GetProvidersAsync(string? region)
+    {
+        string sql;
+        if (!string.IsNullOrWhiteSpace(region))
+        {
+            sql = @"
+                SELECT wp.id, wp.provider_name, wp.logo_path
+                FROM watch_providers wp
+                JOIN movie_watch_providers mwp ON mwp.provider_id = wp.id
+                WHERE mwp.region = $1
+                GROUP BY wp.id, wp.provider_name, wp.logo_path
+                ORDER BY COUNT(DISTINCT mwp.movie_id) DESC, wp.provider_name";
+        }
+        else
+        {
+            sql = @"
+                SELECT wp.id, wp.provider_name, wp.logo_path
+                FROM watch_providers wp
+                ORDER BY wp.provider_name";
+        }
+
+        var providers = new List<ProviderDto>();
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        if (!string.IsNullOrWhiteSpace(region))
+            cmd.Parameters.AddWithValue(region);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var name = reader.GetString(1);
+            if (!MajorProviderNames.Contains(name)) continue;
+            providers.Add(new ProviderDto
+            {
+                Id = reader.GetInt32(0),
+                Name = name,
+                LogoPath = reader.IsDBNull(2) ? null : reader.GetString(2)
+            });
+        }
+        return providers;
+    }
+
+    // Known valid certifications per region. Filters out garbage data (festival tags, language codes, etc.)
+    private static readonly Dictionary<string, HashSet<string>> KnownCertifications =
+        new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["US"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "PG-13", "R", "NC-17", "NR", "TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA" },
+        ["GB"] = new(StringComparer.OrdinalIgnoreCase) { "U", "PG", "12", "12A", "15", "18", "R18" },
+        ["IT"] = new(StringComparer.OrdinalIgnoreCase) { "T", "VM14", "VM18" },
+        ["DE"] = new(StringComparer.OrdinalIgnoreCase) { "0", "6", "12", "16", "18" },
+        ["FR"] = new(StringComparer.OrdinalIgnoreCase) { "U", "10", "12", "16", "18" },
+        ["ES"] = new(StringComparer.OrdinalIgnoreCase) { "APTA", "7", "12", "16", "18" },
+        ["AU"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "M", "MA 15+", "R 18+", "X 18+" },
+        ["CA"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "14A", "18A", "R", "A" },
+        ["JP"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG12", "R15+", "R18+" },
+        ["KR"] = new(StringComparer.OrdinalIgnoreCase) { "All", "12", "15", "18" },
+        ["BR"] = new(StringComparer.OrdinalIgnoreCase) { "L", "10", "12", "14", "16", "18" },
+        ["MX"] = new(StringComparer.OrdinalIgnoreCase) { "AA", "A", "B", "B15", "C", "D" },
+        ["IN"] = new(StringComparer.OrdinalIgnoreCase) { "U", "UA", "A", "S" },
+        ["NL"] = new(StringComparer.OrdinalIgnoreCase) { "AL", "6", "9", "12", "14", "16", "18" },
+        ["NZ"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "M", "R13", "R15", "R16", "R18" },
+        ["RU"] = new(StringComparer.OrdinalIgnoreCase) { "0+", "6+", "12+", "16+", "18+" },
+        ["SE"] = new(StringComparer.OrdinalIgnoreCase) { "BTL", "7", "11", "15" },
+        ["NO"] = new(StringComparer.OrdinalIgnoreCase) { "A", "6", "9", "12", "15", "18" },
+        ["FI"] = new(StringComparer.OrdinalIgnoreCase) { "S", "7", "12", "16", "18" },
+        ["DK"] = new(StringComparer.OrdinalIgnoreCase) { "A", "7", "11", "15" },
+        ["PL"] = new(StringComparer.OrdinalIgnoreCase) { "AP", "7", "12", "15", "18" },
+        ["CH"] = new(StringComparer.OrdinalIgnoreCase) { "0", "6", "12", "14", "16", "18" },
+        ["AT"] = new(StringComparer.OrdinalIgnoreCase) { "Alle", "6", "10", "12", "14", "16" },
+        ["BE"] = new(StringComparer.OrdinalIgnoreCase) { "AL", "KNN", "KNMA", "KN6", "KN9", "KN12", "KN16" },
+        ["TR"] = new(StringComparer.OrdinalIgnoreCase) { "G", "7+", "13+", "18+" },
+        ["SG"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "PG13", "NC16", "M18", "R21" },
+        ["ZA"] = new(StringComparer.OrdinalIgnoreCase) { "A", "PG", "7-9PG", "10-12PG", "13", "16", "18", "X18" },
+        ["AR"] = new(StringComparer.OrdinalIgnoreCase) { "ATP", "+13", "+16", "+18" },
+        ["IE"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "12", "12A", "15A", "16", "18" },
+        ["PT"] = new(StringComparer.OrdinalIgnoreCase) { "Para todos os públicos", "M/6", "M/12", "M/14", "M/16", "M/18" },
+        ["HU"] = new(StringComparer.OrdinalIgnoreCase) { "KN", "6", "12", "16", "18" },
+        ["RO"] = new(StringComparer.OrdinalIgnoreCase) { "AG", "AP", "12", "15", "18", "18X" },
+        ["TH"] = new(StringComparer.OrdinalIgnoreCase) { "P", "G", "13+", "15+", "18+", "20+" },
+        ["PH"] = new(StringComparer.OrdinalIgnoreCase) { "G", "PG", "R-13", "R-16", "R-18", "X" },
+        ["MY"] = new(StringComparer.OrdinalIgnoreCase) { "U", "PG13", "18SG", "18SX", "18PA", "18" },
+        ["ID"] = new(StringComparer.OrdinalIgnoreCase) { "SU", "BO", "R", "D" },
+        ["HK"] = new(StringComparer.OrdinalIgnoreCase) { "I", "IIA", "IIB", "III" },
+        ["TW"] = new(StringComparer.OrdinalIgnoreCase) { "0+", "6+", "12+", "15+", "18+" },
+    };
+
+    public async Task<List<string>> GetCertificationsAsync(string region)
+    {
+        var allCerts = new List<string>();
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT DISTINCT certification FROM movie_certifications WHERE region = $1", conn);
+        cmd.Parameters.AddWithValue(region);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            allCerts.Add(reader.GetString(0));
+
+        // Filter to known certifications for this region if we have a whitelist.
+        // For unknown regions fall back to a basic sanity check (short, starts uppercase).
+        if (KnownCertifications.TryGetValue(region, out var whitelist))
+            return allCerts.Where(c => whitelist.Contains(c)).OrderBy(c => c).ToList();
+
+        return allCerts
+            .Where(c => c.Length <= 10 && c.Length >= 1 && char.IsUpper(c[0]))
+            .OrderBy(c => c)
+            .ToList();
     }
 
     /// <summary>
@@ -364,7 +577,8 @@ public class MovieService
             OriginalLanguage = reader.IsDBNull(reader.GetOrdinal("original_language")) ? null : reader.GetString(reader.GetOrdinal("original_language")),
             Tagline = reader.IsDBNull(reader.GetOrdinal("tagline")) ? null : reader.GetString(reader.GetOrdinal("tagline")),
             PosterPath = reader.IsDBNull(reader.GetOrdinal("poster_path")) ? null : reader.GetString(reader.GetOrdinal("poster_path")),
-            ImdbId = reader.IsDBNull(reader.GetOrdinal("imdb_id")) ? null : reader.GetString(reader.GetOrdinal("imdb_id"))
+            ImdbId = reader.IsDBNull(reader.GetOrdinal("imdb_id")) ? null : reader.GetString(reader.GetOrdinal("imdb_id")),
+            MediaType = reader.IsDBNull(reader.GetOrdinal("media_type")) ? null : reader.GetString(reader.GetOrdinal("media_type"))
         };
     }
 
