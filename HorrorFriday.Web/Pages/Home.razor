@@ -25,37 +25,63 @@
             <div class="search-card">
 
                 @* Search bar *@
-                <div class="search-bar">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                         stroke="@(IsAiMode ? "var(--accent-light)" : "var(--text-muted)")"
-                         stroke-width="2" stroke-linecap="round">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="M21 21l-4.35-4.35" />
-                    </svg>
-                    @* AI MODE toggle button — left side *@
-                    <button class="ai-mode-btn @(IsAiMode ? "ai-mode-btn--active" : "")"
-                            @onclick="ToggleAiMode" type="button">
-                        <span class="ai-mode-dot"></span>
-                        AI
-                    </button>
-                    <input class="search-input"
-                           type="text"
-                           placeholder="@(IsAiMode
-                               ? "Describe what you want to watch — a mood, a feeling, a memory…"
-                               : "Search by title, director, or keyword…")"
-                           @bind="SearchQuery"
-                           @bind:event="oninput"
-                           @onkeydown="HandleSearchKeyDown" />
-                    <button class="search-btn" @onclick="ExecuteSearchFromButton" disabled="@IsLoading">
-                        @if (IsLoading)
-                        {
-                            <LoadingSpinner Size="small" />
-                        }
-                        else
-                        {
-                            <span>Search</span>
-                        }
-                    </button>
+                <div class="search-bar-wrap">
+                    <div class="search-bar">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                             stroke="@(IsAiMode ? "var(--accent-light)" : "var(--text-muted)")"
+                             stroke-width="2" stroke-linecap="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="M21 21l-4.35-4.35" />
+                        </svg>
+                        @* AI MODE toggle button — left side *@
+                        <button class="ai-mode-btn @(IsAiMode ? "ai-mode-btn--active" : "")"
+                                @onclick="ToggleAiMode" type="button">
+                            <span class="ai-mode-dot"></span>
+                            AI
+                        </button>
+                        <input class="search-input"
+                               type="text"
+                               placeholder="@(IsAiMode
+                                   ? "Descrivi atmosfera, sensazione, memoria di un film…"
+                                   : "Cerca per titolo, regista, attore…")"
+                               value="@SearchQuery"
+                               @oninput="HandleSearchInput"
+                               @onkeydown="HandleSearchKeyDown"
+                               @onfocusout="@(() => Task.Delay(180).ContinueWith(_ => { CloseSuggestions(); InvokeAsync(StateHasChanged); }))" />
+                        <button class="search-btn" @onclick="ExecuteSearchFromButton" disabled="@IsLoading">
+                            @if (IsLoading)
+                            {
+                                <LoadingSpinner Size="small" />
+                            }
+                            else
+                            {
+                                <span>Cerca</span>
+                            }
+                        </button>
+                    </div>
+
+                    @* Autocomplete dropdown *@
+                    @if (ShowSuggestions && !IsAiMode)
+                    {
+                        <div class="search-suggest">
+                            @foreach (var s in Suggestions)
+                            {
+                                var sid = s.Id;
+                                var stitle = s.Title;
+                                <button class="search-suggest__item" type="button"
+                                        @onclick="() => SelectSuggestion(s)">
+                                    <span class="search-suggest__type @(s.MediaType == "tv" ? "search-suggest__type--tv" : "search-suggest__type--movie")">
+                                        @(s.MediaType == "tv" ? "TV" : "Film")
+                                    </span>
+                                    <span class="search-suggest__title">@s.Title</span>
+                                    @if (s.ReleaseYear.HasValue)
+                                    {
+                                        <span class="search-suggest__year">@s.ReleaseYear</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
                 </div>
 
                 @* Error strip — shows when a search fails (e.g. OpenAI embedding unavailable) *@
@@ -71,19 +97,33 @@
                     </div>
                 }
 
-                @* AI hint strip — shows when AI mode is on and no query typed *@
+                @* AI explain strip — always visible when AI mode is on *@
+                @if (IsAiMode)
+                {
+                    <div class="ai-explain-strip">
+                        <div class="ai-explain-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                            Semantic Search
+                        </div>
+                        <p class="ai-explain-text">
+                            La tua query viene trasformata in un vettore di 1536 dimensioni tramite OpenAI e confrontata con tutti i film usando <strong>pgvector cosine similarity</strong>. Descrivi atmosfere, memorie, sensazioni — non serve il titolo esatto.
+                        </p>
+                    </div>
+                }
+
+                @* AI hint strip — example queries when AI mode is on and no query typed *@
                 @if (IsAiMode && string.IsNullOrWhiteSpace(SearchQuery))
                 {
                     <div class="ai-hint-strip">
-                        <span class="ai-hint-label">Try:</span>
+                        <span class="ai-hint-label">Prova:</span>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "slow burn folk horror set in winter"'>
-                            "slow burn folk horror set in winter"
+                            "slow burn folk horror in inverno"
                         </button>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "something like Hereditary but more cosmic"'>
-                            "something like Hereditary but more cosmic"
+                            "come Hereditary ma più cosmico"
                         </button>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "horror movie on an island"'>
-                            "horror movie on an island"
+                            "horror su un'isola"
                         </button>
                     </div>
                 }

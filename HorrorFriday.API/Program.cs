@@ -21,6 +21,7 @@ builder.Services.AddScoped<MovieService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<UserMovieService>();
+builder.Services.AddScoped<UserStatsService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<PasswordResetService>();
 

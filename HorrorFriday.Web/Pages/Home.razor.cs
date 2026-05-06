@@ -25,6 +25,12 @@ public partial class Home : ComponentBase
     protected string? SearchError { get; set; }
     protected string? WatchlistError { get; set; }
 
+    // ─────────────── Autocomplete state ───────────────
+
+    protected List<SuggestionDto> Suggestions { get; set; } = new();
+    protected bool ShowSuggestions { get; set; }
+    private CancellationTokenSource? _suggestCts;
+
     // ─────────────── Search state ───────────────
 
     protected string SearchQuery { get; set; } = string.Empty;
@@ -661,9 +667,62 @@ public partial class Home : ComponentBase
     {
         if (e.Key == "Enter")
         {
+            CloseSuggestions();
             CurrentPage = 1;
             await ExecuteSearch();
         }
+        else if (e.Key == "Escape")
+        {
+            CloseSuggestions();
+        }
+    }
+
+    protected async Task HandleSearchInput(ChangeEventArgs e)
+    {
+        SearchQuery = e.Value?.ToString() ?? "";
+
+        if (IsAiMode || SearchQuery.Length < 2)
+        {
+            CloseSuggestions();
+            return;
+        }
+
+        _suggestCts?.Cancel();
+        _suggestCts = new CancellationTokenSource();
+        var token = _suggestCts.Token;
+
+        try
+        {
+            await Task.Delay(220, token);
+            if (token.IsCancellationRequested) return;
+
+            var results = await Http.GetFromJsonAsync<List<SuggestionDto>>(
+                $"api/movies/suggest?q={Uri.EscapeDataString(SearchQuery)}");
+            if (token.IsCancellationRequested) return;
+
+            Suggestions = results ?? new();
+            ShowSuggestions = Suggestions.Count > 0;
+            StateHasChanged();
+        }
+        catch (OperationCanceledException) { }
+        catch
+        {
+            CloseSuggestions();
+        }
+    }
+
+    protected async Task SelectSuggestion(SuggestionDto suggestion)
+    {
+        SearchQuery = suggestion.Title;
+        CloseSuggestions();
+        CurrentPage = 1;
+        await ExecuteSearch();
+    }
+
+    protected void CloseSuggestions()
+    {
+        ShowSuggestions = false;
+        Suggestions = new();
     }
 
     protected void ToggleGenre(string genre)

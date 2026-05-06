@@ -265,8 +265,12 @@ public class MovieService
         var sql = $@"
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
-                   m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id, m.media_type
+                   m.popularity, m.budget, m.revenue, m.status, m.original_language, m.tagline,
+                   m.poster_path, m.backdrop_path, m.imdb_id, m.imdb_rating, m.imdb_votes,
+                   m.cast_list, m.director, m.director_of_photography, m.writers,
+                   m.producers, m.music_composer, m.homepage, m.collection_id,
+                   m.collection_name, m.spoken_languages, m.production_companies,
+                   m.production_countries, m.media_type
             FROM movies m
             {whereClause}
             {orderClause}
@@ -314,8 +318,12 @@ public class MovieService
         var sql = @"
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
-                   m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id, m.media_type,
+                   m.popularity, m.budget, m.revenue, m.status, m.original_language, m.tagline,
+                   m.poster_path, m.backdrop_path, m.imdb_id, m.imdb_rating, m.imdb_votes,
+                   m.cast_list, m.director, m.director_of_photography, m.writers,
+                   m.producers, m.music_composer, m.homepage, m.collection_id,
+                   m.collection_name, m.spoken_languages, m.production_companies,
+                   m.production_countries, m.media_type,
                    m.embedding <=> $1 AS distance
             FROM movies m
             WHERE m.embedding IS NOT NULL
@@ -346,6 +354,68 @@ public class MovieService
         return movies;
     }
 
+    public async Task<List<SuggestionDto>> SuggestAsync(string query, int limit = 7)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2) return new();
+
+        const string sql = @"
+            SELECT id, title, release_year, media_type, poster_path
+            FROM movies
+            WHERE title ILIKE $1
+            ORDER BY popularity DESC NULLS LAST
+            LIMIT $2";
+
+        var suggestions = new List<SuggestionDto>();
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue($"%{query}%");
+        cmd.Parameters.AddWithValue(limit);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            suggestions.Add(new SuggestionDto
+            {
+                Id = reader.GetInt32(0),
+                Title = reader.GetString(1),
+                ReleaseYear = reader.IsDBNull(2) ? null : reader.GetInt16(2),
+                MediaType = reader.IsDBNull(3) ? null : reader.GetString(3),
+                PosterPath = reader.IsDBNull(4) ? null : reader.GetString(4)
+            });
+        }
+        return suggestions;
+    }
+
+    public async Task<List<MovieDto>> GetSimilarAsync(int id, int limit = 12)
+    {
+        const string sql = @"
+            SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
+                   m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
+                   m.popularity, m.budget, m.revenue, m.status, m.original_language, m.tagline,
+                   m.poster_path, m.backdrop_path, m.imdb_id, m.imdb_rating, m.imdb_votes,
+                   m.cast_list, m.director, m.director_of_photography, m.writers,
+                   m.producers, m.music_composer, m.homepage, m.collection_id,
+                   m.collection_name, m.spoken_languages, m.production_companies,
+                   m.production_countries, m.media_type
+            FROM movies m
+            WHERE m.id != $1 AND m.embedding IS NOT NULL
+            ORDER BY m.embedding <=> (SELECT embedding FROM movies WHERE id = $1)
+            LIMIT $2";
+
+        var movies = new List<MovieDto>();
+        await using var conn = await _dataSource.OpenConnectionAsync();
+        await using (var efCmd = new NpgsqlCommand("SET hnsw.ef_search = 20", conn))
+            await efCmd.ExecuteNonQueryAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue(id);
+        cmd.Parameters.AddWithValue(limit);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            movies.Add(ReadMovieFromRow(reader));
+
+        return movies;
+    }
+
     /// <summary>
     /// Gets a single movie by its database ID.
     /// </summary>
@@ -354,8 +424,12 @@ public class MovieService
         var sql = @"
             SELECT m.id, m.tmdb_id, m.title, m.original_title, m.overview,
                    m.release_year, m.runtime_minutes, m.vote_average, m.vote_count,
-                   m.popularity, m.status, m.original_language, m.tagline,
-                   m.poster_path, m.imdb_id, m.media_type
+                   m.popularity, m.budget, m.revenue, m.status, m.original_language, m.tagline,
+                   m.poster_path, m.backdrop_path, m.imdb_id, m.imdb_rating, m.imdb_votes,
+                   m.cast_list, m.director, m.director_of_photography, m.writers,
+                   m.producers, m.music_composer, m.homepage, m.collection_id,
+                   m.collection_name, m.spoken_languages, m.production_companies,
+                   m.production_countries, m.media_type
             FROM movies m
             WHERE m.id = $1";
 
@@ -376,6 +450,7 @@ public class MovieService
         {
             await LoadGenresAsync(new List<MovieDto> { movie }, new List<int> { movie.Id });
             await LoadKeywordsAsync(new List<MovieDto> { movie }, new List<int> { movie.Id });
+            await LoadDetailAvailabilityAsync(movie, "IT");
         }
 
         return movie;
@@ -566,6 +641,7 @@ public class MovieService
         return new MovieDto
         {
             Id = reader.GetInt32(reader.GetOrdinal("id")),
+            TmdbId = reader.IsDBNull(reader.GetOrdinal("tmdb_id")) ? null : reader.GetInt32(reader.GetOrdinal("tmdb_id")),
             Title = reader.GetString(reader.GetOrdinal("title")),
             OriginalTitle = reader.IsDBNull(reader.GetOrdinal("original_title")) ? null : reader.GetString(reader.GetOrdinal("original_title")),
             Overview = reader.IsDBNull(reader.GetOrdinal("overview")) ? null : reader.GetString(reader.GetOrdinal("overview")),
@@ -574,13 +650,89 @@ public class MovieService
             VoteAverage = reader.IsDBNull(reader.GetOrdinal("vote_average")) ? null : reader.GetDecimal(reader.GetOrdinal("vote_average")),
             VoteCount = reader.IsDBNull(reader.GetOrdinal("vote_count")) ? null : reader.GetInt32(reader.GetOrdinal("vote_count")),
             Popularity = reader.IsDBNull(reader.GetOrdinal("popularity")) ? null : reader.GetDecimal(reader.GetOrdinal("popularity")),
+            Budget = reader.IsDBNull(reader.GetOrdinal("budget")) ? null : reader.GetInt64(reader.GetOrdinal("budget")),
+            Revenue = reader.IsDBNull(reader.GetOrdinal("revenue")) ? null : reader.GetInt64(reader.GetOrdinal("revenue")),
             Status = reader.IsDBNull(reader.GetOrdinal("status")) ? null : reader.GetString(reader.GetOrdinal("status")),
             OriginalLanguage = reader.IsDBNull(reader.GetOrdinal("original_language")) ? null : reader.GetString(reader.GetOrdinal("original_language")),
             Tagline = reader.IsDBNull(reader.GetOrdinal("tagline")) ? null : reader.GetString(reader.GetOrdinal("tagline")),
             PosterPath = reader.IsDBNull(reader.GetOrdinal("poster_path")) ? null : reader.GetString(reader.GetOrdinal("poster_path")),
+            BackdropPath = reader.IsDBNull(reader.GetOrdinal("backdrop_path")) ? null : reader.GetString(reader.GetOrdinal("backdrop_path")),
             ImdbId = reader.IsDBNull(reader.GetOrdinal("imdb_id")) ? null : reader.GetString(reader.GetOrdinal("imdb_id")),
+            ImdbRating = reader.IsDBNull(reader.GetOrdinal("imdb_rating")) ? null : reader.GetDecimal(reader.GetOrdinal("imdb_rating")),
+            ImdbVotes = reader.IsDBNull(reader.GetOrdinal("imdb_votes")) ? null : reader.GetInt32(reader.GetOrdinal("imdb_votes")),
+            CastList = reader.IsDBNull(reader.GetOrdinal("cast_list")) ? null : reader.GetString(reader.GetOrdinal("cast_list")),
+            Director = reader.IsDBNull(reader.GetOrdinal("director")) ? null : reader.GetString(reader.GetOrdinal("director")),
+            DirectorOfPhotography = reader.IsDBNull(reader.GetOrdinal("director_of_photography")) ? null : reader.GetString(reader.GetOrdinal("director_of_photography")),
+            Writers = reader.IsDBNull(reader.GetOrdinal("writers")) ? null : reader.GetString(reader.GetOrdinal("writers")),
+            Producers = reader.IsDBNull(reader.GetOrdinal("producers")) ? null : reader.GetString(reader.GetOrdinal("producers")),
+            MusicComposer = reader.IsDBNull(reader.GetOrdinal("music_composer")) ? null : reader.GetString(reader.GetOrdinal("music_composer")),
+            Homepage = reader.IsDBNull(reader.GetOrdinal("homepage")) ? null : reader.GetString(reader.GetOrdinal("homepage")),
+            CollectionId = reader.IsDBNull(reader.GetOrdinal("collection_id")) ? null : reader.GetInt32(reader.GetOrdinal("collection_id")),
+            CollectionName = reader.IsDBNull(reader.GetOrdinal("collection_name")) ? null : reader.GetString(reader.GetOrdinal("collection_name")),
+            SpokenLanguages = reader.IsDBNull(reader.GetOrdinal("spoken_languages")) ? null : reader.GetString(reader.GetOrdinal("spoken_languages")),
+            ProductionCompanies = reader.IsDBNull(reader.GetOrdinal("production_companies")) ? null : reader.GetString(reader.GetOrdinal("production_companies")),
+            ProductionCountries = reader.IsDBNull(reader.GetOrdinal("production_countries")) ? null : reader.GetString(reader.GetOrdinal("production_countries")),
             MediaType = reader.IsDBNull(reader.GetOrdinal("media_type")) ? null : reader.GetString(reader.GetOrdinal("media_type"))
         };
+    }
+
+    private async Task LoadDetailAvailabilityAsync(MovieDto movie, string region)
+    {
+        const string providerSql = @"
+            SELECT wp.id, wp.provider_name, wp.logo_path, mwp.region, mwp.provider_type
+            FROM movie_watch_providers mwp
+            JOIN watch_providers wp ON wp.id = mwp.provider_id
+            WHERE mwp.movie_id = $1 AND mwp.region = $2
+            ORDER BY
+                CASE mwp.provider_type
+                    WHEN 'stream' THEN 1
+                    WHEN 'ads' THEN 2
+                    WHEN 'rent' THEN 3
+                    WHEN 'buy' THEN 4
+                    ELSE 5
+                END,
+                wp.provider_name";
+
+        const string certificationSql = @"
+            SELECT region, certification
+            FROM movie_certifications
+            WHERE movie_id = $1 AND region = $2
+            ORDER BY certification";
+
+        await using var conn = await _dataSource.OpenConnectionAsync();
+
+        await using (var providerCmd = new NpgsqlCommand(providerSql, conn))
+        {
+            providerCmd.Parameters.AddWithValue(movie.Id);
+            providerCmd.Parameters.AddWithValue(region);
+            await using var reader = await providerCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                movie.WatchProviders.Add(new MovieWatchProviderDto
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    LogoPath = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    Region = reader.GetString(3),
+                    Type = reader.GetString(4)
+                });
+            }
+        }
+
+        await using (var certificationCmd = new NpgsqlCommand(certificationSql, conn))
+        {
+            certificationCmd.Parameters.AddWithValue(movie.Id);
+            certificationCmd.Parameters.AddWithValue(region);
+            await using var reader = await certificationCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                movie.Certifications.Add(new MovieCertificationDto
+                {
+                    Region = reader.GetString(0),
+                    Certification = reader.GetString(1)
+                });
+            }
+        }
     }
 
     /// <summary>

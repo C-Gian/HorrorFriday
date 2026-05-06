@@ -38,6 +38,73 @@
                 </div>
             </section>
 
+            @* ── Data visualisation ── *@
+            @if (Stats is not null)
+            {
+                <section class="pv-grid">
+
+                    @* Rating distribution bar chart *@
+                    <div class="pv-card">
+                        <div class="pv-card__header">
+                            <span>I tuoi voti</span>
+                            <strong>Media: @FormatRating(Stats.AverageRating)</strong>
+                        </div>
+                        <div class="pv-rating-chart">
+                            @for (var r = 10; r >= 1; r--)
+                            {
+                                var rating = r;
+                                var height = GetRatingBarHeight(rating);
+                                var count  = GetRatingCount(rating);
+                                <div class="pv-rating-col" title="@count voti a @rating">
+                                    <div class="pv-bar" style="height:@(height)%"></div>
+                                    <span>@rating</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* Top genres horizontal bars *@
+                    @if (Stats.TopGenres.Count > 0)
+                    {
+                        <div class="pv-card">
+                            <div class="pv-card__header"><span>Generi preferiti</span></div>
+                            <div class="pv-genre-list">
+                                @foreach (var g in Stats.TopGenres)
+                                {
+                                    var width = GetGenreBarWidth(g.Count);
+                                    <div class="pv-genre-row">
+                                        <span class="pv-genre-name">@g.Genre</span>
+                                        <div class="pv-genre-track">
+                                            <div class="pv-genre-fill" style="width:@(width)%"></div>
+                                        </div>
+                                        <span class="pv-genre-count">@g.Count</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @* Monthly activity *@
+                    @if (Stats.MonthlyActivity.Count > 0)
+                    {
+                        <div class="pv-card pv-card--wide">
+                            <div class="pv-card__header"><span>Attività ultimi 12 mesi</span></div>
+                            <div class="pv-activity-chart">
+                                @foreach (var m in Stats.MonthlyActivity)
+                                {
+                                    var barH = GetActivityBarHeight(m);
+                                    <div class="pv-activity-col" title="@m.Count film — @GetMonthLabel(m) @m.Year">
+                                        <div class="pv-bar pv-bar--activity" style="height:@(barH)%"></div>
+                                        <span>@GetMonthLabel(m)</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                </section>
+            }
+
             <section class="profile-toolbar">
                 @foreach (var option in FilterOptions)
                 {

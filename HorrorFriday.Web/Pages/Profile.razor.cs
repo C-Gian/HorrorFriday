@@ -12,6 +12,7 @@ public partial class Profile : ComponentBase
     [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     protected bool IsLoading { get; set; } = true;
+    protected UserStatsDto? Stats { get; set; }
     protected List<UserMovieLibraryItemDto> Library { get; set; } = new();
     protected string ActiveFilter { get; set; } = "all";
 
@@ -42,8 +43,23 @@ public partial class Profile : ComponentBase
             return;
         }
 
-        await LoadLibraryAsync();
+        await Task.WhenAll(LoadLibraryAsync(), LoadStatsAsync());
         IsLoading = false;
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        try
+        {
+            var response = await AuthService.SendAuthorizedAsync(
+                () => new HttpRequestMessage(HttpMethod.Get, "api/user/stats"));
+            if (response.IsSuccessStatusCode)
+                Stats = await response.Content.ReadFromJsonAsync<UserStatsDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Profile] Failed to load stats: {ex.Message}");
+        }
     }
 
     private async Task LoadLibraryAsync()
@@ -110,4 +126,39 @@ public partial class Profile : ComponentBase
         if (string.IsNullOrWhiteSpace(username)) return "HF";
         return username[..Math.Min(2, username.Length)].ToUpperInvariant();
     }
+
+    // ── Chart helpers ──
+
+    protected int GetRatingBarHeight(int rating)
+    {
+        if (Stats is null || Stats.RatingDistribution.Count == 0) return 0;
+        var max = Stats.RatingDistribution.Values.Max();
+        if (max == 0) return 0;
+        var count = Stats.RatingDistribution.TryGetValue(rating, out var c) ? c : 0;
+        return (int)Math.Round((double)count / max * 100);
+    }
+
+    protected int GetRatingCount(int rating) =>
+        Stats?.RatingDistribution.TryGetValue(rating, out var c) == true ? c : 0;
+
+    protected int GetGenreBarWidth(int count)
+    {
+        if (Stats is null || Stats.TopGenres.Count == 0) return 0;
+        var max = Stats.TopGenres.Max(g => g.Count);
+        return max == 0 ? 0 : (int)Math.Round((double)count / max * 100);
+    }
+
+    protected int GetActivityBarHeight(MonthlyActivityDto item)
+    {
+        if (Stats is null || Stats.MonthlyActivity.Count == 0) return 0;
+        var max = Stats.MonthlyActivity.Max(m => m.Count);
+        return max == 0 ? 0 : (int)Math.Round((double)item.Count / max * 100);
+    }
+
+    private static readonly string[] MonthAbbr =
+        ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+    protected string GetMonthLabel(MonthlyActivityDto item) => MonthAbbr[item.Month - 1];
+
+    protected string FormatRating(decimal? r) => r.HasValue ? r.Value.ToString("0.0") : "—";
 }

@@ -6,70 +6,82 @@
     @if (IsLoading)
     {
         <div class="md-loading">
-            <LoadingSpinner Size="large" Message="Loading..." />
+            <LoadingSpinner Size="large" Message="Caricamento..." />
         </div>
     }
     else if (Movie is null)
     {
-        <div class="md-shell" style="padding-top:120px;">
+        <div class="md-shell md-shell--empty">
             <button class="md-back-btn" @onclick="GoBack">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-                Back to results
+                Torna ai risultati
             </button>
-            <div class="empty-state" style="margin-top:56px;">
+            <div class="empty-state">
                 <div class="empty-state-icon">?</div>
-                <p class="empty-state-text">Title not found.</p>
+                <p class="empty-state-text">Titolo non trovato.</p>
             </div>
         </div>
     }
     else
     {
-        @* ── HERO ── *@
-        <div class="md-hero">
-            @if (!string.IsNullOrEmpty(Movie.PosterPath))
+        <section class="md-hero">
+            @if (!string.IsNullOrEmpty(GetBackdropPath()))
             {
                 <div class="md-hero__backdrop"
-                     style="background-image:url('https://image.tmdb.org/t/p/w780@(Movie.PosterPath)')"></div>
+                     style="background-image:url('@(GetTmdbImageUrl(GetBackdropPath(), "w1280"))')"></div>
             }
             <div class="md-hero__overlay"></div>
+            <div class="md-hero__grain"></div>
 
             <div class="md-shell">
-                <button class="md-back-btn" @onclick="GoBack">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-                    Back to results
-                </button>
+                <div class="md-topbar">
+                    <button class="md-back-btn" @onclick="GoBack">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                        Torna ai risultati
+                    </button>
 
-                <div class="md-layout">
+                    <div class="md-hero-links">
+                        @if (!string.IsNullOrWhiteSpace(Movie.Homepage))
+                        {
+                            <a href="@Movie.Homepage" target="_blank" rel="noopener noreferrer">Sito ufficiale</a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Movie.ImdbId))
+                        {
+                            <a href="https://www.imdb.com/title/@Movie.ImdbId" target="_blank" rel="noopener noreferrer">IMDb</a>
+                        }
+                        <a href="@GetTmdbTitleUrl()" target="_blank" rel="noopener noreferrer">TMDB</a>
+                    </div>
+                </div>
 
-                    @* LEFT – poster *@
+                <div class="md-hero-grid">
                     <aside class="md-poster-col">
                         @if (!string.IsNullOrEmpty(Movie.PosterPath))
                         {
                             <img class="md-poster"
-                                 src="https://image.tmdb.org/t/p/w500@(Movie.PosterPath)"
+                                 src="@(GetTmdbImageUrl(Movie.PosterPath, "w500"))"
                                  alt="@Movie.Title" />
                         }
                         else
                         {
-                            <div class="md-poster md-poster--empty"><span>No poster</span></div>
+                            <div class="md-poster md-poster--empty"><span>Nessun poster</span></div>
                         }
                     </aside>
 
-                    @* RIGHT – info *@
-                    <div class="md-info-col">
-
-                        @* Type badge + genre chips *@
+                    <div class="md-hero-main md-glass-panel">
                         <div class="md-meta-top">
                             <span class="md-type-badge md-type-badge--@(Movie.MediaType ?? "movie")">
-                                @(Movie.MediaType == "tv" ? "TV Series" : "Movie")
+                                @(Movie.MediaType == "tv" ? "Serie TV" : "Film")
                             </span>
-                            @foreach (var genre in Movie.Genres)
+                            @if (!string.IsNullOrWhiteSpace(Movie.Status))
                             {
-                                <span class="md-genre-pill">@genre</span>
+                                <span class="md-type-badge">@Movie.Status</span>
+                            }
+                            @foreach (var certification in Movie.Certifications.Take(1))
+                            {
+                                <span class="md-type-badge">@certification.Region @certification.Certification</span>
                             }
                         </div>
 
-                        @* Title *@
                         <h1 class="md-title">@Movie.Title</h1>
 
                         @if (!string.IsNullOrWhiteSpace(Movie.OriginalTitle) && Movie.OriginalTitle != Movie.Title)
@@ -77,220 +89,321 @@
                             <p class="md-original-title">@Movie.OriginalTitle</p>
                         }
 
-                        @* Tagline *@
                         @if (!string.IsNullOrWhiteSpace(Movie.Tagline))
                         {
                             <p class="md-tagline">"@Movie.Tagline"</p>
                         }
 
-                        @* Meta strip: year · runtime · language · status *@
-                        <div class="md-meta-strip">
-                            @if (Movie.ReleaseYear.HasValue)
-                            {
-                                <span>@Movie.ReleaseYear</span>
-                            }
-                            @if (Movie.RuntimeMinutes.HasValue)
-                            {
-                                <span>@FormatRuntime(Movie.RuntimeMinutes.Value)</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(Movie.OriginalLanguage))
-                            {
-                                <span>@Movie.OriginalLanguage!.ToUpperInvariant()</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(Movie.Status) && Movie.Status != "Released")
-                            {
-                                <span class="md-meta-status">@Movie.Status</span>
-                            }
+                        <div class="md-quick-facts">
+                            <div>
+                                <span>Anno</span>
+                                <strong>@(Movie.ReleaseYear?.ToString() ?? "N/D")</strong>
+                            </div>
+                            <div>
+                                <span>Durata</span>
+                                <strong>@(Movie.RuntimeMinutes.HasValue ? FormatRuntime(Movie.RuntimeMinutes.Value) : "N/D")</strong>
+                            </div>
+                            <div>
+                                <span>Lingua</span>
+                                <strong>@(string.IsNullOrWhiteSpace(Movie.OriginalLanguage) ? "N/D" : Movie.OriginalLanguage!.ToUpperInvariant())</strong>
+                            </div>
+                            <div>
+                                <span>TMDB</span>
+                                <strong>@FormatScore(Movie.VoteAverage)</strong>
+                            </div>
+                            <div>
+                                <span>IMDb</span>
+                                <strong>@FormatScore(Movie.ImdbRating)</strong>
+                            </div>
                         </div>
 
-                        @* Score row *@
-                        <div class="md-score-row">
-                            @if (Movie.VoteAverage.HasValue && Movie.VoteAverage > 0)
-                            {
-                                <div class="md-score-card md-score-card--rating">
-                                    <span class="md-score-card__star">★</span>
-                                    <div>
-                                        <div class="md-score-card__value-line">
-                                            <span class="md-score-card__value">@Movie.VoteAverage.Value.ToString("0.0")</span>
-                                            <span class="md-score-card__sublabel">/ 10</span>
-                                        </div>
-                                        <span class="md-score-card__label">public rating</span>
-                                    </div>
-                                </div>
-                            }
-                            @if (Movie.VoteCount.HasValue && Movie.VoteCount > 0)
-                            {
-                                <div class="md-score-card">
-                                    <span class="md-score-card__value">@FormatVoteCount(Movie.VoteCount)</span>
-                                    <span class="md-score-card__label">votes</span>
-                                </div>
-                            }
-                            @if (Movie.Popularity.HasValue && Movie.Popularity > 0)
-                            {
-                                <div class="md-score-card">
-                                    <span class="md-score-card__value">@FormatPopularity(Movie.Popularity)</span>
-                                    <span class="md-score-card__label">popularity</span>
-                                </div>
-                            }
-                        </div>
+                        @if (Movie.Genres.Count > 0)
+                        {
+                            <div class="md-genre-row">
+                                @foreach (var genre in Movie.Genres.Take(6))
+                                {
+                                    <span class="md-genre-pill">@genre</span>
+                                }
+                            </div>
+                        }
 
-                        @* Overview *@
                         <p class="md-overview">@GetOverview()</p>
-
                     </div>
+
+                    <aside class="md-user-panel md-glass-panel">
+                        @if (AuthService.IsLoggedIn)
+                        {
+                            <div class="md-user-panel__header">
+                                <span>La tua scheda</span>
+                                @if (!string.IsNullOrEmpty(SaveMessage))
+                                {
+                                    <strong class="md-save-msg @(IsPositiveSaveMessage() ? "md-save-msg--ok" : "md-save-msg--err")">
+                                        @SaveMessage
+                                    </strong>
+                                }
+                            </div>
+
+                            <div class="md-list-action">
+                                <button class="md-action-btn md-action-btn--primary" type="button" @onclick="ToggleListMenu">
+                                    <span>+</span>
+                                    @GetSelectedStatusLabel()
+                                    <span class="md-action-caret">v</span>
+                                </button>
+
+                                @if (IsListMenuOpen)
+                                {
+                                    <div class="md-list-menu">
+                                        @foreach (var option in StatusOptions)
+                                        {
+                                            <button class="md-list-menu__item @(SelectedStatus == option.Value ? "md-list-menu__item--active" : "")"
+                                                    type="button"
+                                                    @onclick="() => SelectStatus(option.Value)">
+                                                <span>@GetStatusIcon(option.Value)</span>
+                                                @option.Label
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="md-field-section">
+                                <span class="md-field-label">Voto personale</span>
+                                <div class="md-rating-grid">
+                                    @for (var v = 1; v <= 10; v++)
+                                    {
+                                        var rating = v;
+                                        <button type="button"
+                                                class="md-rating-btn @(SelectedRating == rating ? "md-rating-btn--active" : "")"
+                                                @onclick="() => SelectRating(rating)">@rating</button>
+                                    }
+                                </div>
+                                @if (SelectedRating.HasValue)
+                                {
+                                    <button type="button" class="md-clear-link" @onclick="ClearRating">Rimuovi voto</button>
+                                }
+                            </div>
+
+                            <label class="md-field-section">
+                                <span class="md-field-label">Note private</span>
+                                <textarea class="md-notes-input"
+                                          placeholder="Appunti, impressioni, scene da ricordare..."
+                                          maxlength="800"
+                                          @bind="UserNotes"
+                                          @bind:event="oninput"></textarea>
+                            </label>
+
+                            <div class="md-panel-actions">
+                                <button class="md-save-btn" @onclick="SaveUserMovieAsync" disabled="@IsSaving">
+                                    @(IsSaving ? "Salvataggio..." : "Salva")
+                                </button>
+                                @if (HasUserEntry)
+                                {
+                                    <button class="md-remove-btn" @onclick="RemoveFromLibraryAsync" disabled="@IsSaving">
+                                        Rimuovi
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="md-user-panel__header">
+                                <span>La tua scheda</span>
+                            </div>
+                            <p class="md-empty-copy">Accedi per aggiungerlo alla tua libreria, votarlo e salvare note private.</p>
+                            <a class="md-save-btn" href="/login">Accedi</a>
+                        }
+                    </aside>
                 </div>
             </div>
-        </div>
+        </section>
 
-        @* ── LOWER SECTION ── *@
-        <div class="md-lower">
-
-            @* Library / tracking panel *@
-            @if (AuthService.IsLoggedIn)
-            {
-                <div class="md-panel md-library">
-                    <div class="md-panel__header">
-                        <span class="md-panel__title">My tracking</span>
-                        @if (!string.IsNullOrEmpty(SaveMessage))
-                        {
-                            <span class="md-save-msg @(SaveMessage == "Saved" ? "md-save-msg--ok" : "md-save-msg--err")">
-                                @SaveMessage
-                            </span>
-                        }
+        @if (SimilarMovies.Count > 0)
+        {
+            <section class="md-similar">
+                <div class="md-shell">
+                    <div class="md-similar__header">
+                        <span>Basato sui vettori embedding</span>
+                        <h2>Titoli simili</h2>
                     </div>
-
-                    <div class="md-status-grid">
-                        @foreach (var option in StatusOptions)
+                    <div class="md-similar__scroll">
+                        @foreach (var sim in SimilarMovies)
                         {
-                            <button class="md-status-btn md-status-btn--@option.Value @(SelectedStatus == option.Value ? "md-status-btn--active" : "")"
-                                    @onclick="() => SelectStatus(option.Value)" type="button">
-                                @option.Label
+                            var simUrl = "/movie/" + sim.Id;
+                            <button class="md-sim-card" type="button" @onclick="() => Navigation.NavigateTo(simUrl)">
+                                @if (!string.IsNullOrEmpty(sim.PosterPath))
+                                {
+                                    <img src="@(GetTmdbImageUrl(sim.PosterPath, "w185"))" alt="@sim.Title" />
+                                }
+                                else
+                                {
+                                    <div class="md-sim-card__no-poster">?</div>
+                                }
+                                <div class="md-sim-card__info">
+                                    <strong>@sim.Title</strong>
+                                    <span>@(sim.ReleaseYear?.ToString() ?? "—") · @FormatScore(sim.VoteAverage)</span>
+                                </div>
                             </button>
                         }
                     </div>
+                </div>
+            </section>
+        }
 
-                    <div class="md-field-section">
-                        <span class="md-field-label">Your rating</span>
-                        <div class="md-rating-grid">
-                            @for (var v = 1; v <= 10; v++)
+        <main class="md-content">
+            <div class="md-content-grid">
+                <div class="md-content-main">
+                    <section class="md-section md-feature-section">
+                        <div class="md-section__header">
+                            <span>Credits</span>
+                            <h2>Cast e crew</h2>
+                        </div>
+                        @if (HasPeopleCards())
+                        {
+                            <div class="md-people-grid">
+                                @foreach (var person in GetPeopleCards())
+                                {
+                                    <div class="md-person-card">
+                                        <span>@person.Role</span>
+                                        <strong>@person.Name</strong>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="md-empty-copy">Nessun dato cast o crew disponibile.</p>
+                        }
+                    </section>
+
+                    <section class="md-section">
+                        <div class="md-section__header">
+                            <span>Database</span>
+                            <h2>Produzione</h2>
+                        </div>
+                        <div class="md-detail-grid">
+                            <div class="md-detail-item">
+                                <span>Paesi</span>
+                                <strong>@FormatCsvValue(Movie.ProductionCountries)</strong>
+                            </div>
+                            <div class="md-detail-item">
+                                <span>Lingue</span>
+                                <strong>@FormatCsvValue(Movie.SpokenLanguages)</strong>
+                            </div>
+                            <div class="md-detail-item md-detail-item--wide">
+                                <span>Compagnie</span>
+                                <strong>@FormatCsvValue(Movie.ProductionCompanies)</strong>
+                            </div>
+                            <div class="md-detail-item">
+                                <span>Collection</span>
+                                <strong>@(string.IsNullOrWhiteSpace(Movie.CollectionName) ? "N/D" : Movie.CollectionName)</strong>
+                            </div>
+                            <div class="md-detail-item">
+                                <span>Budget</span>
+                                <strong>@FormatMoney(Movie.Budget)</strong>
+                            </div>
+                            <div class="md-detail-item">
+                                <span>Incasso</span>
+                                <strong>@FormatMoney(Movie.Revenue)</strong>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="md-section">
+                        <div class="md-section__header">
+                            <span>Motivi</span>
+                            <h2>Keyword</h2>
+                        </div>
+
+                        @if (Movie.Keywords.Count > 0)
+                        {
+                            <div class="md-keywords">
+                                @foreach (var kw in Movie.Keywords.Take(40))
+                                {
+                                    <span class="md-keyword">@kw</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="md-empty-copy">Nessuna keyword disponibile.</p>
+                        }
+                    </section>
+                </div>
+
+                <aside class="md-content-rail">
+                    <section class="md-section md-watch-card">
+                        <div class="md-section__header">
+                            <span>Italia</span>
+                            <h2>Dove guardarlo</h2>
+                        </div>
+
+                        @if (Movie.WatchProviders.Count > 0)
+                        {
+                            <div class="md-provider-grid">
+                                @foreach (var provider in Movie.WatchProviders)
+                                {
+                                    <div class="md-provider-card">
+                                        @if (!string.IsNullOrEmpty(provider.LogoPath))
+                                        {
+                                            <img src="@(GetTmdbImageUrl(provider.LogoPath, "w45"))" alt="" />
+                                        }
+                                        <div>
+                                            <strong>@provider.Name</strong>
+                                            <span>@FormatProviderType(provider.Type)</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="md-empty-copy">Nessuna disponibilita italiana salvata per questo titolo.</p>
+                        }
+                    </section>
+
+                    <section class="md-section md-scoreboard">
+                        <div class="md-section__header">
+                            <span>Metriche</span>
+                            <h2>Rating</h2>
+                        </div>
+                        <div class="md-scoreboard__grid">
+                            <div>
+                                <span>TMDB</span>
+                                <strong>@FormatScore(Movie.VoteAverage)</strong>
+                                <small>@FormatVoteCount(Movie.VoteCount) voti</small>
+                            </div>
+                            <div>
+                                <span>IMDb</span>
+                                <strong>@FormatScore(Movie.ImdbRating)</strong>
+                                <small>@FormatVoteCount(Movie.ImdbVotes) voti</small>
+                            </div>
+                            <div>
+                                <span>Popolarita</span>
+                                <strong>@FormatPopularity(Movie.Popularity)</strong>
+                                <small>indice TMDB</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="md-section md-link-card">
+                        <div class="md-section__header">
+                            <span>Fonti</span>
+                            <h2>Link</h2>
+                        </div>
+                        <div class="md-link-row">
+                            @if (!string.IsNullOrWhiteSpace(Movie.Homepage))
                             {
-                                var rating = v;
-                                <button type="button"
-                                        class="md-rating-btn @(SelectedRating == rating ? "md-rating-btn--active" : "")"
-                                        @onclick="() => SelectRating(rating)">@rating</button>
+                                <a class="md-link-btn" href="@Movie.Homepage" target="_blank" rel="noopener noreferrer">Sito ufficiale</a>
                             }
-                        </div>
-                        @if (SelectedRating.HasValue)
-                        {
-                            <button type="button" class="md-clear-link" @onclick="ClearRating">Clear rating</button>
-                        }
-                    </div>
-
-                    <label class="md-field-section">
-                        <span class="md-field-label">Private notes</span>
-                        <textarea class="md-notes-input"
-                                  placeholder="What stayed with you?"
-                                  maxlength="800"
-                                  @bind="UserNotes"
-                                  @bind:event="oninput"></textarea>
-                    </label>
-
-                    <div class="md-panel-actions">
-                        <button class="md-save-btn" @onclick="SaveUserMovieAsync" disabled="@IsSaving">
-                            @(IsSaving ? "Saving…" : "Save")
-                        </button>
-                        @if (HasUserEntry)
-                        {
-                            <button class="md-remove-btn" @onclick="RemoveFromLibraryAsync" disabled="@IsSaving">
-                                Remove from list
-                            </button>
-                        }
-                    </div>
-                </div>
-            }
-            else
-            {
-                <div class="md-panel md-signin-panel">
-                    <span>Sign in to track this title, rate it, and keep private notes.</span>
-                    <a class="md-save-btn" href="/login">Sign in</a>
-                </div>
-            }
-
-            @* Secondary panels column *@
-            <div class="md-secondary">
-
-                @* Dread profile *@
-                <div class="md-panel">
-                    <div class="md-panel__header">
-                        <span class="md-panel__title">Dread profile</span>
-                        <span class="md-panel__sub">derived from catalog signals</span>
-                    </div>
-                    <div class="md-dread-grid">
-                        <div class="md-dread-meter">
-                            <div class="md-dread-meter__top">
-                                <span>Audience confidence</span>
-                                <span class="md-dread-meter__pct">@GetConfidencePercent()%</span>
-                            </div>
-                            <div class="md-dread-meter__track">
-                                <div class="md-dread-meter__fill" style="width:@GetConfidencePercent()%"></div>
-                            </div>
-                        </div>
-                        <div class="md-dread-meter">
-                            <div class="md-dread-meter__top">
-                                <span>Obscurity</span>
-                                <span class="md-dread-meter__pct">@GetObscurityPercent()%</span>
-                            </div>
-                            <div class="md-dread-meter__track">
-                                <div class="md-dread-meter__fill md-dread-meter__fill--amber" style="width:@GetObscurityPercent()%"></div>
-                            </div>
-                        </div>
-                        <div class="md-dread-meter">
-                            <div class="md-dread-meter__top">
-                                <span>Runtime pressure</span>
-                                <span class="md-dread-meter__pct">@GetRuntimePercent()%</span>
-                            </div>
-                            <div class="md-dread-meter__track">
-                                <div class="md-dread-meter__fill md-dread-meter__fill--muted" style="width:@GetRuntimePercent()%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                @* Motifs / keywords *@
-                @if (Movie.Keywords.Count > 0)
-                {
-                    <div class="md-panel">
-                        <div class="md-panel__header">
-                            <span class="md-panel__title">Motifs</span>
-                            <span class="md-panel__sub">@Movie.Keywords.Count keyword@(Movie.Keywords.Count == 1 ? "" : "s")</span>
-                        </div>
-                        <div class="md-keywords">
-                            @foreach (var kw in Movie.Keywords.Take(32))
+                            @if (!string.IsNullOrWhiteSpace(Movie.ImdbId))
                             {
-                                <span class="md-keyword">@kw</span>
+                                <a class="md-link-btn" href="https://www.imdb.com/title/@Movie.ImdbId" target="_blank" rel="noopener noreferrer">IMDb</a>
                             }
+                            <a class="md-link-btn" href="@GetTmdbTitleUrl()" target="_blank" rel="noopener noreferrer">TMDB</a>
                         </div>
-                    </div>
-                }
-
-                @* External links *@
-                <div class="md-panel">
-                    <div class="md-panel__header">
-                        <span class="md-panel__title">External links</span>
-                    </div>
-                    <div class="md-link-row">
-                        @if (!string.IsNullOrWhiteSpace(Movie.ImdbId))
-                        {
-                            <a class="md-link-btn" href="https://www.imdb.com/title/@Movie.ImdbId"
-                               target="_blank" rel="noopener noreferrer">IMDb ↗</a>
-                        }
-                        <a class="md-link-btn"
-                           href="https://www.themoviedb.org/search?query=@Uri.EscapeDataString(Movie.Title)"
-                           target="_blank" rel="noopener noreferrer">TMDB ↗</a>
-                    </div>
-                </div>
-
+                    </section>
+                </aside>
             </div>
-        </div>
+        </main>
     }
 </div>

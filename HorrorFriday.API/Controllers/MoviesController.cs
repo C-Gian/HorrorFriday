@@ -44,6 +44,21 @@ public class MoviesController : ControllerBase
         return Ok(movie);
     }
 
+    [HttpGet("suggest")]
+    public async Task<ActionResult<List<SuggestionDto>>> Suggest([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Length < 2) return Ok(new List<SuggestionDto>());
+        var results = await _movieService.SuggestAsync(q.Trim(), 7);
+        return Ok(results);
+    }
+
+    [HttpGet("{id}/similar")]
+    public async Task<ActionResult<List<MovieDto>>> GetSimilar(int id, [FromQuery] int limit = 12)
+    {
+        var movies = await _movieService.GetSimilarAsync(id, Math.Clamp(limit, 1, 24));
+        return Ok(movies);
+    }
+
     [HttpGet("genres")]
     public async Task<ActionResult<List<string>>> GetGenres()
     {

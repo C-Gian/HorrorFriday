@@ -16,9 +16,11 @@ public partial class MovieDetail : ComponentBase
     [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     protected MovieDto? Movie { get; set; }
+    protected List<MovieDto> SimilarMovies { get; set; } = new();
     protected bool IsLoading { get; set; } = true;
     protected bool IsSaving { get; set; }
     protected bool HasUserEntry { get; set; }
+    protected bool IsListMenuOpen { get; set; }
     protected string SelectedStatus { get; set; } = "to_watch";
     protected int? SelectedRating { get; set; }
     protected string UserNotes { get; set; } = "";
@@ -26,10 +28,10 @@ public partial class MovieDetail : ComponentBase
 
     protected static readonly List<(string Value, string Label)> StatusOptions = new()
     {
-        ("to_watch", "To Watch"),
-        ("watching", "Watching"),
-        ("watched", "Watched"),
-        ("dropped", "Dropped")
+        ("to_watch", "Da guardare"),
+        ("watching", "In visione"),
+        ("watched", "Visto"),
+        ("dropped", "Abbandonato")
     };
 
     protected override async Task OnParametersSetAsync()
@@ -43,7 +45,23 @@ public partial class MovieDetail : ComponentBase
         if (AuthService.IsLoggedIn)
             await LoadUserEntryAsync();
 
+        await LoadSimilarAsync();
+
         IsLoading = false;
+    }
+
+    private async Task LoadSimilarAsync()
+    {
+        if (Movie is null) return;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<MovieDto>>($"api/movies/{MovieId}/similar?limit=12");
+            SimilarMovies = result ?? new();
+        }
+        catch
+        {
+            SimilarMovies = new();
+        }
     }
 
     private async Task LoadMovieAsync()
@@ -95,6 +113,7 @@ public partial class MovieDetail : ComponentBase
     protected void SelectStatus(string status)
     {
         SelectedStatus = status;
+        IsListMenuOpen = false;
         SaveMessage = null;
     }
 
@@ -139,12 +158,12 @@ public partial class MovieDetail : ComponentBase
             if (response.IsSuccessStatusCode)
             {
                 HasUserEntry = true;
-                SaveMessage = "Saved";
+                SaveMessage = "Salvato";
             }
             else
             {
                 var body = await response.Content.ReadAsStringAsync();
-                SaveMessage = "Save failed";
+                SaveMessage = "Errore salvataggio";
                 Console.WriteLine($"[MovieDetail] Save failed {response.StatusCode}: {body}");
             }
         }
@@ -172,11 +191,11 @@ public partial class MovieDetail : ComponentBase
                 SelectedStatus = "to_watch";
                 SelectedRating = null;
                 UserNotes = "";
-                SaveMessage = "Removed";
+                SaveMessage = "Rimosso";
             }
             else
             {
-                SaveMessage = "Remove failed";
+                SaveMessage = "Errore rimozione";
             }
         }
         finally
@@ -200,10 +219,43 @@ public partial class MovieDetail : ComponentBase
         Navigation.NavigateTo("/");
     }
 
+    protected void ToggleListMenu()
+    {
+        IsListMenuOpen = !IsListMenuOpen;
+    }
+
+    protected string GetSelectedStatusLabel() =>
+        StatusOptions.FirstOrDefault(o => o.Value == SelectedStatus).Label ?? "Scegli lista";
+
+    protected static string GetStatusIcon(string status) => status switch
+    {
+        "to_watch" => "+",
+        "watching" => ">",
+        "watched" => "ok",
+        "dropped" => "x",
+        _ => "-"
+    };
+
     protected string GetOverview() =>
         string.IsNullOrWhiteSpace(Movie?.Overview)
             ? "No overview available for this title."
             : Movie.Overview!;
+
+    protected string? GetBackdropPath() =>
+        string.IsNullOrWhiteSpace(Movie?.BackdropPath) ? Movie?.PosterPath : Movie.BackdropPath;
+
+    protected static string GetTmdbImageUrl(string? path, string size) =>
+        string.IsNullOrWhiteSpace(path) ? "" : $"https://image.tmdb.org/t/p/{size}{path}";
+
+    protected string GetTmdbTitleUrl()
+    {
+        if (Movie?.TmdbId is > 0)
+            return $"https://www.themoviedb.org/{(Movie.MediaType == "tv" ? "tv" : "movie")}/{Movie.TmdbId}";
+
+        return Movie is null
+            ? "https://www.themoviedb.org"
+            : $"https://www.themoviedb.org/search?query={Uri.EscapeDataString(Movie.Title)}";
+    }
 
     protected static string FormatRuntime(short minutes)
     {
@@ -221,6 +273,68 @@ public partial class MovieDetail : ComponentBase
 
     protected static string FormatPopularity(decimal? popularity) =>
         popularity.HasValue ? popularity.Value.ToString("0") : "N/A";
+
+    protected static string FormatMoney(long? amount) =>
+        amount.HasValue && amount.Value > 0 ? $"${amount.Value:N0}" : "N/D";
+
+    protected static string FormatCsvValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "N/D";
+        var parts = SplitCsv(value).Take(4).ToList();
+        return parts.Count == 0 ? "N/D" : string.Join(", ", parts);
+    }
+
+    protected static string FormatProviderType(string type) => type switch
+    {
+        "stream" => "Streaming",
+        "ads" => "Gratis con pubblicità",
+        "rent" => "Noleggio",
+        "buy" => "Acquisto",
+        _ => type
+    };
+
+    protected bool IsPositiveSaveMessage() =>
+        SaveMessage is "Salvato" or "Rimosso";
+
+    protected IEnumerable<(string Role, string Name)> GetPeopleCards()
+    {
+        foreach (var name in SplitCsv(Movie?.Director).Take(3))
+            yield return (Movie?.MediaType == "tv" ? "Creator" : "Regia", name);
+
+        foreach (var name in SplitCsv(Movie?.CastList).Take(6))
+            yield return ("Cast", name);
+
+        foreach (var name in SplitCsv(Movie?.Writers).Take(3))
+            yield return ("Sceneggiatura", name);
+
+        foreach (var name in SplitCsv(Movie?.DirectorOfPhotography).Take(2))
+            yield return ("Fotografia", name);
+
+        foreach (var name in SplitCsv(Movie?.MusicComposer).Take(2))
+            yield return ("Musica", name);
+    }
+
+    protected bool HasPeopleCards() => GetPeopleCards().Any();
+
+    private static IEnumerable<string> SplitCsv(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) yield break;
+
+        foreach (var part in value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(part))
+                yield return part;
+        }
+    }
+
+    protected int GetRatingPercent()
+    {
+        if (Movie?.VoteAverage is null || Movie.VoteAverage <= 0) return 0;
+        return Math.Clamp((int)Math.Round(Movie.VoteAverage.Value * 10), 0, 100);
+    }
+
+    protected string FormatScorePercent() =>
+        GetRatingPercent() > 0 ? GetRatingPercent().ToString() : "--";
 
     protected int GetConfidencePercent()
     {
