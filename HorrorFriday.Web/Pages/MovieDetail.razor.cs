@@ -18,6 +18,7 @@ public partial class MovieDetail : ComponentBase
     protected MovieDto? Movie { get; set; }
     protected List<MovieDto> SimilarMovies { get; set; } = new();
     protected bool IsLoading { get; set; } = true;
+    protected string ActiveTab { get; set; } = "cast";
     protected bool IsSaving { get; set; }
     protected bool HasUserEntry { get; set; }
     protected bool IsListMenuOpen { get; set; }
@@ -222,6 +223,16 @@ public partial class MovieDetail : ComponentBase
     protected void ToggleListMenu()
     {
         IsListMenuOpen = !IsListMenuOpen;
+    }
+
+    protected void SetTab(string tab) => ActiveTab = tab;
+
+    protected string GetScoreColorVar()
+    {
+        var pct = GetRatingPercent();
+        if (pct >= 75) return "#62c96c";
+        if (pct >= 60) return "#c49529";
+        return "#d44a4a";
     }
 
     protected string GetSelectedStatusLabel() =>

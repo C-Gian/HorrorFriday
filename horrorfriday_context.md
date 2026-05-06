@@ -197,7 +197,7 @@ Singolo file: `HorrorFriday.Web/wwwroot/css/app.css`
 
 Design tokens in `:root`: `--bg #0a0908`, `--surface #111110`, `--surface-alt #1a1918`, `--border #252321`, `--text #e8e0d4`, `--text-secondary #a89e90`, `--text-muted #6b6358`, `--accent #9b1c1c`, `--accent-light #d44a4a`, `--amber #c4952a`, `--font-display / --font-body: 'Space Grotesk'`
 
-Nota: il CSS ha due blocchi `md-*` (un vecchio e un "Premium detail redesign" ~linea 2660). I modifier class `md-watch-card`, `md-link-card`, `md-scoreboard` non sono definiti esplicitamente ma le sezioni funzionano correttamente tramite la base class `md-section`.
+Il blocco `md-*` è unico e pulito (nessun duplicato). Prefissi interni al blocco: `md-col-*` per le colonne del grid, `md-score-*` per il ring dei voti, `md-sim-*` per le card titoli simili.
 
 ---
 
@@ -256,28 +256,40 @@ Nota: il CSS ha due blocchi `md-*` (un vecchio e un "Premium detail redesign" ~l
 
 ### Movie Detail Page (`/movie/{id}`)
 **Files:** `MovieDetail.razor` + `MovieDetail.razor.cs`
-**CSS prefix:** `md-*` (tutti i vecchi selettori `movie-detail-*` / `detail-*` rimossi da `app.css`)
-**Build:** ✅ CLEAN — 0 errori, 0 warning
+**CSS prefix:** `md-*`
 
-**Layout hero:**
-```
-md-hero (backdrop fullwidth: backdrop_path → fallback poster_path, blurred + overlay + grain)
-  md-topbar: [← Torna ai risultati]  [Sito ufficiale] [IMDb] [TMDB]
-  md-hero-grid (3 col):
-    md-poster-col (sticky)
-    md-hero-main.md-glass-panel:
-      md-meta-top: type badge (Film/Serie TV) | status | certification
-      md-title, md-original-title, md-tagline
-      md-quick-facts: Anno | Durata | Lingua | TMDB | IMDb
-      md-genre-row: genre pills
-      md-overview
-    md-user-panel.md-glass-panel: status dropdown + rating 1-10 + note + salva/rimuovi
+**Layout:** `md-backdrop` (position:fixed, blurred, zero layout space) come sfondo di pagina. Il contenuto scrollabile è in `md-frame` (max-width 1260px, padding-top = altezza navbar).
 
-md-content (sotto l'hero):
-  md-content-grid (2 col):
-    md-content-main: Cast & Crew | Produzione | Keywords
-    md-content-rail (sticky): Dove guardarlo | Rating | Link
 ```
+md-topbar: [← Torna] ────────────── [Sito ufficiale] [IMDb] [TMDB]
+
+md-grid (3 colonne: 200px | 1fr | 300px)
+  md-col-poster (sticky top:88px)
+    └── md-poster
+
+  md-col-main
+    ├── md-badges: tipo (Film/Serie TV) | certificazione
+    ├── md-title, md-original-title, md-tagline
+    ├── md-genre-row: genre pills
+    ├── md-meta-row: Anno · Durata · Lingua [· Status se non Released]
+    ├── md-overview
+    ├── md-tabs: [Cast & Crew] [Produzione] [Keywords] [Titoli simili]
+    └── md-tab-body (conditional render su ActiveTab):
+          cast       → md-people-grid
+          production → md-detail-grid
+          keywords   → md-keywords
+          similar    → md-sim-grid (grid, non scroll)
+
+  md-col-right (sticky top:88px)
+    ├── md-score-card
+    │     └── md-score-ring (conic-gradient, --pct e --clr inline style)
+    │           colore: verde ≥75% | ambra ≥60% | rosso <60%
+    ├── md-panel.md-track-panel: status dropdown + rating 1–10 + note + salva/rimuovi
+    ├── md-panel: Dove guardarlo (providers, solo se presenti)
+    └── md-panel: Link (Sito ufficiale, IMDb, TMDB)
+```
+
+**Stato tab in razor.cs:** `ActiveTab` (string, default "cast"), `SetTab(string tab)`
 
 **Helper methods in razor.cs:**
 - `GetBackdropPath()` → `BackdropPath ?? PosterPath`
@@ -286,16 +298,39 @@ md-content (sotto l'hero):
 - `FormatRuntime(short minutes)` → "2h 14min"
 - `FormatCsvValue(string?)` → split su virgola, max 4 valori, "N/D" se vuoto
 - `GetPeopleCards()` → Director/Creator, Cast (6), Writers (3), DOP (2), Music (2)
-- `ToggleListMenu()` / `GetSelectedStatusLabel()` / `GetStatusIcon(status)` — dropdown stato
+- `GetRatingPercent()` → `VoteAverage × 10` clampato 0–100
+- `GetScoreColorVar()` → colore hex per il ring in base al rating percent
+- `ToggleListMenu()` / `GetSelectedStatusLabel()` — dropdown stato
 
 **Status labels (italiano):** Da guardare / In visione / Visto / Abbandonato
 
-**Dread Profile (computato, niente dati extra DB):**
-- Audience confidence: `vote_average × 10` clampato 8–100
-- Obscurity: `100 - log10(vote_count+1)/5 × 100` clampato 8–96
-- Runtime pressure: `runtime_minutes / 180 × 100` clampato 10–100
-
 **Navigation back:** `GoBack()` → `Navigation.NavigateTo("/")` → Home ripristina da sessionStorage
+
+### Titoli simili
+**API:** `GET /api/movies/{id}/similar?limit=12`
+**Service:** `MovieService.GetSimilarAsync(int id, int limit)` — query con subquery inline nell'ORDER BY (NON CTE — la CTE materializzata impedisce l'uso dell'indice HNSW):
+```sql
+ORDER BY m.embedding <=> (SELECT embedding FROM movies WHERE id = $1)
+```
+Prima della query: `SET hnsw.ef_search = 20` sulla stessa connessione.
+
+**Indice DB:** `movies_embedding_hnsw_idx` — `USING hnsw (embedding vector_cosine_ops) WITH (m=16, ef_construction=64)`. Creato con `CREATE INDEX CONCURRENTLY`. Tempo query con indice: ~5–50ms.
+
+**Frontend:** `SimilarMovies` lista in `MovieDetail.razor.cs`, caricata in `OnParametersSetAsync`. Mostrata nel tab "Titoli simili" come `md-sim-grid` (grid responsive, non scroll orizzontale).
+
+### Autocomplete search
+**API:** `GET /api/movies/suggest?q=&limit=7` — `ILIKE %q%` su title, ordinato per popularity DESC
+**DTO:** `SuggestionDto` in `HorrorFriday.API/Models/MovieDto.cs` e mirror in `HorrorFriday.Web/Models/MovieDto.cs`
+**Frontend:** debounce 220ms in `HandleSearchInput`, solo se non AI mode e query ≥ 2 char. Dropdown `.search-suggest` con tipo (Film/TV), titolo, anno. Non mostrato in AI mode.
+
+### AI Explain Strip
+Quando AI mode attivo, banda fissa `.ai-explain-strip` sopra i risultati spiega la ricerca semantica (pgvector cosine similarity, OpenAI embedding).
+
+### Profile Statistics (`/profile`)
+**API:** `GET /api/user/stats` — `[Authorize]` — `UserStatsController` → `UserStatsService.GetStatsAsync(userId)`
+**Queries (4 separate):** status counts GROUP BY status | rating distribution GROUP BY user_rating | top 8 generi (JOIN movie_genres+genres) | monthly activity ultimi 13 mesi
+**DTO:** `UserStatsDto` con `RatingDistribution (Dictionary<int,int>)`, `TopGenres (List<GenreCountDto>)`, `MonthlyActivity (List<MonthlyActivityDto>)`
+**Frontend charts (CSS-only):** barre verticali per distribuzione rating (1–10) | barre orizzontali per top generi | barre verticali per attività mensile (12 mesi)
 
 ### Movie Cards (griglia)
 **Files:** `MovieCard.razor` + `MovieCard.razor.cs`, usato in `Home.razor`
@@ -342,23 +377,27 @@ TmdbImporter (HorrorFriday.TmdbImporter/):
   Data/ (gitignored)                       → dump files (.json.gz o .json estratto)
 
 API:
-  Controllers/MoviesController.cs         → search, getById, genres, regions, providers, certifications
+  Controllers/MoviesController.cs         → search, getById, suggest, similar, genres, regions, providers, certifications
   Controllers/AuthController.cs           → register, login, refresh, google
   Controllers/AccountController.cs        → change-password/email/username, forgot/reset-password
-  Services/MovieService.cs                → SearchAsync (dynamic SQL builder), GetByIdAsync, filtri availability
+  Controllers/UserStatsController.cs      → [Authorize] GET /api/user/stats
+  Services/MovieService.cs                → SearchAsync (dynamic SQL builder), GetByIdAsync, SuggestAsync, GetSimilarAsync, filtri availability
   Services/AuthService.cs                 → tutta la logica DB utenti
-  Models/MovieDto.cs                      → MovieDto + MovieWatchProviderDto + MovieCertificationDto
+  Services/UserStatsService.cs            → GetStatsAsync(userId) — 4 query aggregate
+  Models/MovieDto.cs                      → MovieDto + MovieWatchProviderDto + MovieCertificationDto + SuggestionDto
   Models/SearchRequest.cs                 → tutti i parametri di filtro
+  Models/UserStatsDto.cs                  → UserStatsDto + GenreCountDto + MonthlyActivityDto
 
 Web:
   Pages/Home.razor(.cs)                   → griglia ricerca + tutti i filtri
-  Pages/MovieDetail.razor(.cs)            → pagina dettaglio film
+  Pages/MovieDetail.razor(.cs)            → pagina dettaglio film (3-col grid + tab component + score ring)
   Pages/Login.razor(.cs)                  → sign in / register
   Pages/Settings.razor(.cs)              → username/email/password
   Pages/Privacy.razor / CookiePolicy.razor → pagine legali
   Shared/AppNavbar.razor(.cs)             → nav + profile menu
   Shared/MovieCard.razor(.cs)             → card nella griglia
-  Models/MovieDto.cs                      → mirror del DTO API (stesso schema)
+  Models/MovieDto.cs                      → mirror del DTO API (stesso schema, include SuggestionDto)
+  Models/UserStatsDto.cs                  → mirror API (UserStatsDto + GenreCountDto + MonthlyActivityDto)
   Services/AuthService.cs                 → auth client-side, storage routing, SendAuthorizedAsync()
   wwwroot/css/app.css                     → tutti gli stili (file singolo)
   wwwroot/js/app.js                       → JS interop: sessionStorage, scroll, click-outside
@@ -402,13 +441,10 @@ Web:
 | Backfill cert/provider | ❌ Da fare | Mode [3] per tutti i film esistenti + nuovi TV dopo Mode [6] |
 
 ### Feature da costruire (non bloccanti)
-1. **Titoli simili** — `ORDER BY embedding <=> (SELECT embedding FROM movies WHERE id=$1) LIMIT 12` — gratuito, zero costi, tutto già in casa
-2. **Trailer** — fetch on-demand da TMDB `/movie/{id}/videos` (chiave YouTube). Richiede `TMDB_API_KEY` nella config API a runtime. Non ancora iniziato.
-3. **Pagina profilo con statistiche** — aggregare `user_movies`: titoli visti, generi preferiti, distribuzione voti
-4. **Error boundary globale** — `<ErrorBoundary>` in `MainLayout.razor`
-5. **Loading skeleton** per la griglia cards
-6. **Meta/OG tags** per SEO e link preview (Blazor WASM non fa SSR)
-7. **Autocomplete** nella search bar
+1. **Trailer** — fetch on-demand da TMDB `/movie/{id}/videos` (chiave YouTube). Richiede `TMDB_API_KEY` nella config API a runtime. Non ancora iniziato.
+2. **Error boundary globale** — `<ErrorBoundary>` in `MainLayout.razor`
+3. **Loading skeleton** per la griglia cards
+4. **Meta/OG tags** per SEO e link preview (Blazor WASM non fa SSR)
 
 ---
 
