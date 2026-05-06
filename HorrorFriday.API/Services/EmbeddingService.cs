@@ -14,6 +14,8 @@ public class EmbeddingService : IDisposable
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            Console.WriteLine("[EmbeddingService] WARNING: OpenAI API key is empty — semantic search will fail.");
     }
 
     public async Task<float[]?> GenerateEmbeddingAsync(string text)

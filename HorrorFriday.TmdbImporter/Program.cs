@@ -10,7 +10,10 @@ if (File.Exists(envPath))
     {
         var parts = line.Split('=', 2);
         if (parts.Length == 2 && !parts[0].StartsWith('#'))
-            Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
+        {
+            var val = parts[1].Trim().Trim('"').Trim('\'');
+            Environment.SetEnvironmentVariable(parts[0].Trim(), val);
+        }
     }
 
 var connectionString = Environment.GetEnvironmentVariable("HF_DB") ?? "";

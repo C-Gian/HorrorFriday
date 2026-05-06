@@ -1,3 +1,10 @@
+// ── Filter state persistence (session) ──────────────────────────────────
+window.hfSaveState  = (k, v) => sessionStorage.setItem(k, v);
+window.hfLoadState  = (k)    => sessionStorage.getItem(k);
+window.hfClearState = (k)    => sessionStorage.removeItem(k);
+window.hfScrollY    = ()     => window.scrollY;
+window.hfScrollTo   = (y)    => window.scrollTo({ top: y, behavior: 'instant' });
+
 window.getBrowserRegion = function () {
     var lang = (navigator.languages && navigator.languages[0]) || navigator.language || '';
     var parts = lang.split('-');

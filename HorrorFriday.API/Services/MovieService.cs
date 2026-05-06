@@ -216,8 +216,9 @@ public class MovieService
         if (!string.IsNullOrWhiteSpace(request.SemanticQuery))
         {
             queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(request.SemanticQuery);
-            if (queryEmbedding != null)
-                conditions.Add("m.embedding IS NOT NULL");
+            if (queryEmbedding == null)
+                throw new InvalidOperationException("AI search non disponibile: impossibile generare l'embedding. Verifica la chiave OpenAI.");
+            conditions.Add("m.embedding IS NOT NULL");
         }
 
         // Build the WHERE clause

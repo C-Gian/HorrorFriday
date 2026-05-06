@@ -23,6 +23,10 @@
     <div class="poster-overlay">
         <span class="poster-title">@Movie.Title</span>
         <span class="poster-meta">
+            @if (Movie.MediaType == "tv")
+            {
+                <span class="poster-meta__type">TV</span>
+            }
             @if (Movie.ReleaseYear.HasValue)
             {
                 @Movie.ReleaseYear
@@ -39,11 +43,6 @@
         <div class="poster-rating">
             &#9733; @Movie.VoteAverage.Value.ToString("0.0")
         </div>
-    }
-
-    @if (Movie.MediaType == "tv")
-    {
-        <div class="poster-type-badge">SERIES</div>
     }
 
     <div class="poster-hover-overlay">

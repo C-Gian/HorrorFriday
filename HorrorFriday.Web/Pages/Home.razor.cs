@@ -22,6 +22,7 @@ public partial class Home : ComponentBase
 
     protected bool IsAdvancedOpen { get; set; }
     protected bool IsAiMode { get; set; } = false;
+    protected string? SearchError { get; set; }
 
     // ─────────────── Search state ───────────────
 
@@ -194,12 +195,83 @@ public partial class Home : ComponentBase
 
     // ─────────────── Lifecycle ───────────────
 
+    private bool _pendingScrollRestore;
+    private double _scrollRestoreY;
+
     protected override async Task OnInitializedAsync()
     {
         await AuthService.InitializeAsync();
-        await Task.WhenAll(LoadGenres(), LoadRegions(), LoadProviders());
-        await TryPreSelectRegionFromBrowserAsync();
+
+        var restored = await TryRestoreFilterStateAsync();
+        if (!restored)
+        {
+            await Task.WhenAll(LoadGenres(), LoadRegions(), LoadProviders());
+            await TryPreSelectRegionFromBrowserAsync();
+        }
+
         await ExecuteSearch();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingScrollRestore)
+        {
+            _pendingScrollRestore = false;
+            try { await JS.InvokeVoidAsync("hfScrollTo", _scrollRestoreY); }
+            catch { }
+        }
+    }
+
+    private async Task<bool> TryRestoreFilterStateAsync()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("hfLoadState", "hf_filter_state");
+            if (string.IsNullOrEmpty(json)) return false;
+
+            await JS.InvokeVoidAsync("hfClearState", "hf_filter_state");
+
+            var state = System.Text.Json.JsonSerializer.Deserialize<FilterState>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (state is null) return false;
+
+            SearchQuery     = state.SearchQuery ?? "";
+            IsAiMode        = state.IsAiMode;
+            IsAdvancedOpen  = state.IsAdvancedOpen;
+            MediaType       = state.MediaType;
+            IncludedGenres  = state.IncludedGenres.ToHashSet();
+            ExcludedGenres  = state.ExcludedGenres.ToHashSet();
+            HideStatuses    = state.HideStatuses.ToHashSet();
+            YearFromText    = state.YearFromText;
+            YearToText      = state.YearToText;
+            MinRatingText   = state.MinRatingText;
+            MaxRatingText   = state.MaxRatingText;
+            MaxRuntimeText  = state.MaxRuntimeText;
+            SortBy          = state.SortBy;
+            SortDirection   = state.SortDirection;
+            IncludeUpcoming = state.IncludeUpcoming;
+            CurrentPage     = state.CurrentPage;
+
+            await Task.WhenAll(LoadGenres(), LoadRegions());
+
+            if (!string.IsNullOrEmpty(state.SelectedRegion))
+            {
+                SelectedRegion = state.SelectedRegion;
+                await Task.WhenAll(LoadProviders(), LoadCertifications());
+                SelectedProviderIds    = state.SelectedProviderIds.ToHashSet();
+                SelectedCertifications = state.SelectedCertifications.ToHashSet();
+            }
+            else
+            {
+                await LoadProviders();
+            }
+
+            _pendingScrollRestore = true;
+            _scrollRestoreY       = state.ScrollY;
+
+            return true;
+        }
+        catch { return false; }
     }
 
     private async Task TryPreSelectRegionFromBrowserAsync()
@@ -288,6 +360,7 @@ public partial class Home : ComponentBase
     protected async Task ExecuteSearch()
     {
         OpenStatusPickerId = null;
+        SearchError = null;
         IsLoading = true;
         StateHasChanged();
 
@@ -343,6 +416,15 @@ public partial class Home : ComponentBase
             else
             {
                 Console.WriteLine($"[Home] Search returned {response.StatusCode}");
+                try
+                {
+                    var errBody = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    SearchError = errBody.GetProperty("error").GetString();
+                }
+                catch
+                {
+                    SearchError = $"Search error ({(int)response.StatusCode}).";
+                }
                 SetEmptyResults();
             }
 
@@ -642,8 +724,38 @@ public partial class Home : ComponentBase
         await ExecuteSearch();
     }
 
-    protected void NavigateToMovie(int movieId)
+    protected async Task NavigateToMovie(int movieId)
     {
+        try
+        {
+            var state = new FilterState
+            {
+                SearchQuery     = SearchQuery,
+                IsAiMode        = IsAiMode,
+                IsAdvancedOpen  = IsAdvancedOpen,
+                MediaType       = MediaType,
+                IncludedGenres  = IncludedGenres.ToList(),
+                ExcludedGenres  = ExcludedGenres.ToList(),
+                HideStatuses    = HideStatuses.ToList(),
+                YearFromText    = YearFromText,
+                YearToText      = YearToText,
+                MinRatingText   = MinRatingText,
+                MaxRatingText   = MaxRatingText,
+                MaxRuntimeText  = MaxRuntimeText,
+                SortBy          = SortBy,
+                SortDirection   = SortDirection,
+                IncludeUpcoming = IncludeUpcoming,
+                SelectedRegion  = SelectedRegion,
+                SelectedProviderIds    = SelectedProviderIds.ToList(),
+                SelectedCertifications = SelectedCertifications.ToList(),
+                CurrentPage     = CurrentPage,
+                ScrollY         = await JS.InvokeAsync<double>("hfScrollY")
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(state);
+            await JS.InvokeVoidAsync("hfSaveState", "hf_filter_state", json);
+        }
+        catch { }
+
         Navigation.NavigateTo($"/movie/{movieId}");
     }
 
@@ -717,4 +829,28 @@ public partial class Home : ComponentBase
     }
 
     public record SortOption(string Value, string Label);
+
+    private class FilterState
+    {
+        public string? SearchQuery { get; set; }
+        public bool IsAiMode { get; set; }
+        public bool IsAdvancedOpen { get; set; }
+        public string MediaType { get; set; } = "all";
+        public List<string> IncludedGenres { get; set; } = [];
+        public List<string> ExcludedGenres { get; set; } = [];
+        public List<string> HideStatuses { get; set; } = [];
+        public string YearFromText { get; set; } = "";
+        public string YearToText { get; set; } = "";
+        public string MinRatingText { get; set; } = "";
+        public string MaxRatingText { get; set; } = "";
+        public string MaxRuntimeText { get; set; } = "";
+        public string SortBy { get; set; } = "popularity";
+        public string SortDirection { get; set; } = "desc";
+        public bool IncludeUpcoming { get; set; }
+        public string? SelectedRegion { get; set; }
+        public List<int> SelectedProviderIds { get; set; } = [];
+        public List<string> SelectedCertifications { get; set; } = [];
+        public int CurrentPage { get; set; } = 1;
+        public double ScrollY { get; set; }
+    }
 }

@@ -25,8 +25,15 @@ public class MoviesController : ControllerBase
         var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (int.TryParse(claim, out var id)) userId = id;
 
-        var result = await _movieService.SearchAsync(request, userId);
-        return Ok(result);
+        try
+        {
+            var result = await _movieService.SearchAsync(request, userId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(503, new { error = ex.Message });
+        }
     }
 
     [HttpGet("{id}")]
