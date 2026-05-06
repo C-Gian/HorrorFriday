@@ -23,6 +23,7 @@ public partial class Home : ComponentBase
     protected bool IsAdvancedOpen { get; set; }
     protected bool IsAiMode { get; set; } = false;
     protected string? SearchError { get; set; }
+    protected string? WatchlistError { get; set; }
 
     // ─────────────── Search state ───────────────
 
@@ -497,6 +498,7 @@ public partial class Home : ComponentBase
     private async Task SetMovieStatus(int movieId, string? status)
     {
         OpenStatusPickerId = null;
+        WatchlistError = null;
 
         try
         {
@@ -526,11 +528,13 @@ public partial class Home : ComponentBase
             {
                 var body = await response.Content.ReadAsStringAsync();
                 Console.WriteLine($"[Home] SetMovieStatus failed {response.StatusCode}: {body}");
+                WatchlistError = $"Watchlist error ({(int)response.StatusCode}): {body}";
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Home] SetMovieStatus exception: {ex.Message}");
+            WatchlistError = $"Watchlist error: {ex.Message}";
         }
 
         StateHasChanged();
@@ -548,7 +552,7 @@ public partial class Home : ComponentBase
         StateHasChanged();
     }
 
-    protected async Task ToggleHideStatus(string status)
+    protected void ToggleHideStatus(string status)
     {
         if (HideStatuses.Contains(status))
             HideStatuses.Remove(status);
@@ -556,14 +560,12 @@ public partial class Home : ComponentBase
             HideStatuses.Add(status);
 
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
-    protected async Task SetMediaType(string type)
+    protected void SetMediaType(string type)
     {
         MediaType = type;
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
     protected async Task OnRegionChangedAsync(string value)
@@ -573,27 +575,24 @@ public partial class Home : ComponentBase
         SelectedCertifications.Clear();
         await Task.WhenAll(LoadProviders(), LoadCertifications());
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
-    protected async Task ToggleProvider(int providerId)
+    protected void ToggleProvider(int providerId)
     {
         if (SelectedProviderIds.Contains(providerId))
             SelectedProviderIds.Remove(providerId);
         else
             SelectedProviderIds.Add(providerId);
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
-    protected async Task ToggleCertification(string cert)
+    protected void ToggleCertification(string cert)
     {
         if (SelectedCertifications.Contains(cert))
             SelectedCertifications.Remove(cert);
         else
             SelectedCertifications.Add(cert);
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
     // ─────────────── Input clamping (prevents invalid input) ───────────────
@@ -602,8 +601,13 @@ public partial class Home : ComponentBase
     {
         if (string.IsNullOrEmpty(raw)) return "";
         var digits = new string(raw.Where(char.IsDigit).Take(4).ToArray());
-        if (digits.Length > 0 && digits[0] != '1' && digits[0] != '2')
-            digits = "";
+        if (digits.Length == 0) return "";
+        if (digits[0] != '1' && digits[0] != '2') return "";
+        if (digits.Length == 4 && int.TryParse(digits, out var year))
+        {
+            if (year < 1895) return "1895";
+            if (year > 2030) return "2030";
+        }
         return digits;
     }
 
@@ -635,7 +639,7 @@ public partial class Home : ComponentBase
     private static int? TryParseYear(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
-        return int.TryParse(text, out var v) && v >= 1888 && v <= 2030 ? v : null;
+        return int.TryParse(text, out var v) && v >= 1895 && v <= 2030 ? v : null;
     }
 
     private static decimal? TryParseRating(string text)
@@ -662,7 +666,7 @@ public partial class Home : ComponentBase
         }
     }
 
-    protected async Task ToggleGenre(string genre)
+    protected void ToggleGenre(string genre)
     {
         if (IncludedGenres.Contains(genre))
         {
@@ -679,7 +683,6 @@ public partial class Home : ComponentBase
         }
 
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
     protected string GetGenreState(string genre)
@@ -715,13 +718,10 @@ public partial class Home : ComponentBase
         SortDirection = DefaultSortDirection;
         IncludeUpcoming = false;
         MediaType = "all";
-        SelectedRegion = null;
         SelectedProviderIds.Clear();
         SelectedCertifications.Clear();
-        AllCertifications.Clear();
         await LoadProviders();
         CurrentPage = 1;
-        await ExecuteSearch();
     }
 
     protected async Task NavigateToMovie(int movieId)

@@ -160,15 +160,6 @@
 
                     @* Filter actions *@
                     <div class="hf-filter-actions">
-                        @if (ActiveFilterCount > 0)
-                        {
-                            <span class="hf-active-count">
-                                @ActiveFilterCount filter@(ActiveFilterCount > 1 ? "s" : "") active
-                            </span>
-                            <button type="button" class="hf-clear-btn" @onclick="ClearAllFilters">
-                                Clear filters
-                            </button>
-                        }
                         <button class="hf-more-toggle @(IsAdvancedOpen ? "hf-more-toggle--open" : "")"
                                 @onclick="ToggleAdvanced" type="button">
                             @(IsAdvancedOpen ? "Fewer filters" : "More filters")
@@ -188,14 +179,16 @@
                                     <input type="text" class="hf-input"
                                            placeholder="1900" inputmode="numeric"
                                            maxlength="4" pattern="[0-9]*"
-                                           value="@YearFromText"
-                                           @oninput="e => YearFromText = ClampYearInput(e.Value?.ToString())" />
+                                           @bind:get="YearFromText"
+                                           @bind:set="v => YearFromText = ClampYearInput(v)"
+                                           @bind:event="oninput" />
                                     <span class="hf-dash">—</span>
                                     <input type="text" class="hf-input"
                                            placeholder="2026" inputmode="numeric"
                                            maxlength="4" pattern="[0-9]*"
-                                           value="@YearToText"
-                                           @oninput="e => YearToText = ClampYearInput(e.Value?.ToString())" />
+                                           @bind:get="YearToText"
+                                           @bind:set="v => YearToText = ClampYearInput(v)"
+                                           @bind:event="oninput" />
                                 </div>
                             </div>
 
@@ -206,14 +199,16 @@
                                     <input type="text" class="hf-input hf-input--rating"
                                            placeholder="0" inputmode="decimal"
                                            maxlength="4"
-                                           value="@MinRatingText"
-                                           @oninput="e => MinRatingText = ClampRatingInput(e.Value?.ToString())" />
+                                           @bind:get="MinRatingText"
+                                           @bind:set="v => MinRatingText = ClampRatingInput(v)"
+                                           @bind:event="oninput" />
                                     <span class="hf-dash">—</span>
                                     <input type="text" class="hf-input hf-input--rating"
                                            placeholder="10" inputmode="decimal"
                                            maxlength="4"
-                                           value="@MaxRatingText"
-                                           @oninput="e => MaxRatingText = ClampRatingInput(e.Value?.ToString())" />
+                                           @bind:get="MaxRatingText"
+                                           @bind:set="v => MaxRatingText = ClampRatingInput(v)"
+                                           @bind:event="oninput" />
                                 </div>
                             </div>
 
@@ -224,8 +219,9 @@
                                     <input type="text" class="hf-input hf-input--runtime"
                                            placeholder="any" inputmode="numeric"
                                            maxlength="3" pattern="[0-9]*"
-                                           value="@MaxRuntimeText"
-                                           @oninput="e => MaxRuntimeText = ClampRuntimeInput(e.Value?.ToString())" />
+                                           @bind:get="MaxRuntimeText"
+                                           @bind:set="v => MaxRuntimeText = ClampRuntimeInput(v)"
+                                           @bind:event="oninput" />
                                     <span class="hf-suffix">min</span>
                                 </div>
                             </div>
@@ -335,6 +331,17 @@
                                     <span class="hf-toggle__label">Include upcoming movies</span>
                                 </div>
                             </div>
+                            <div class="hf-filters__footer-right">
+                                @if (ActiveFilterCount > 0)
+                                {
+                                    <span class="hf-active-count">
+                                        @ActiveFilterCount filter@(ActiveFilterCount > 1 ? "s" : "") active
+                                    </span>
+                                    <button type="button" class="hf-clear-btn" @onclick="ClearAllFilters">
+                                        Clear filters
+                                    </button>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -343,6 +350,10 @@
     </div>
 
     @* ===== RESULTS ===== *@
+    @if (!string.IsNullOrEmpty(WatchlistError))
+    {
+        <div class="watchlist-error-bar">@WatchlistError</div>
+    }
     <section class="results-section">
         @if (IsLoading && Movies is null)
         {
@@ -371,7 +382,7 @@
                 {
                     MovieStatuses.TryGetValue(movie.Id, out var currentStatus);
 
-                    <MovieCard Movie="movie"
+                    <MovieCard @key="movie.Id" Movie="movie"
                                IsLoggedIn="AuthService.IsLoggedIn"
                                Status="@currentStatus"
                                IsStatusPickerOpen="@(OpenStatusPickerId == movie.Id)"

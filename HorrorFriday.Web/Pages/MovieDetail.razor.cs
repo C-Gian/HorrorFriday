@@ -200,17 +200,18 @@ public partial class MovieDetail : ComponentBase
         Navigation.NavigateTo("/");
     }
 
-    protected string GetPosterBackdropStyle() =>
-        string.IsNullOrWhiteSpace(Movie?.PosterPath)
-            ? ""
-            : $"background-image: url('https://image.tmdb.org/t/p/w780{Movie.PosterPath}');";
-
     protected string GetOverview() =>
         string.IsNullOrWhiteSpace(Movie?.Overview)
             ? "No overview available for this title."
             : Movie.Overview!;
 
-    protected static string FormatYear(short? year) => year?.ToString() ?? "Unknown year";
+    protected static string FormatRuntime(short minutes)
+    {
+        if (minutes < 60) return $"{minutes}min";
+        var h = minutes / 60;
+        var m = minutes % 60;
+        return m == 0 ? $"{h}h" : $"{h}h {m}min";
+    }
 
     protected static string FormatScore(decimal? score) =>
         score.HasValue && score > 0 ? score.Value.ToString("0.0") : "N/A";

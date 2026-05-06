@@ -26,7 +26,7 @@ builder.Services.AddScoped<PasswordResetService>();
 
 // --- JWT Authentication ---
 var jwtSecret = builder.Configuration["Jwt:Secret"]!;
-var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HorrorFriday";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

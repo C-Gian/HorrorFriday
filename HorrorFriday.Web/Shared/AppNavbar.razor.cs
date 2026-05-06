@@ -19,6 +19,7 @@ public partial class AppNavbar : ComponentBase, IAsyncDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        AuthService.OnAuthStateChanged += StateHasChanged;
         await AuthService.InitializeAsync();
     }
 
@@ -63,6 +64,7 @@ public partial class AppNavbar : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        AuthService.OnAuthStateChanged -= StateHasChanged;
         await JS.InvokeVoidAsync("userMenu.close");
         _dotNetRef?.Dispose();
     }

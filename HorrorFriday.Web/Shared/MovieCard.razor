@@ -53,7 +53,7 @@
 
     @if (IsLoggedIn)
     {
-        <div class="poster-status" @onclick:stopPropagation="true">
+        <div class="poster-status" @onclick="HandleStatusAreaClick" @onclick:stopPropagation="true">
             <button class="poster-status-btn @(HasStatus ? $"poster-status-btn--{Status}" : "poster-status-btn--empty")"
                     @onclick="HandleToggleStatusPicker"
                     title="@(HasStatus ? GetStatusLabel(Status!) : "Add to list")">

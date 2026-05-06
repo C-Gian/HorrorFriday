@@ -13,8 +13,10 @@ public class AuthService
     private string? _token;
     private string? _refreshToken;
     private UserInfo? _currentUser;
-    private bool _initialized;
+    private Task? _initTask;
     private bool _useLocalStorage = true;
+
+    public event Action? OnAuthStateChanged;
 
     public AuthService(HttpClient http, IJSRuntime js)
     {
@@ -26,11 +28,14 @@ public class AuthService
     public UserInfo? CurrentUser => _currentUser;
     public string? Token => _token;
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        if (_initialized) return;
-        _initialized = true;
+        _initTask ??= DoInitializeAsync();
+        return _initTask;
+    }
 
+    private async Task DoInitializeAsync()
+    {
         // Check sessionStorage first (not-remembered session), then localStorage
         var token = await _js.InvokeAsync<string?>("sessionStorage.getItem", "hf_token");
         if (token is not null)
@@ -60,6 +65,8 @@ public class AuthService
             HasPassword = hasPassword == "true"
         };
     }
+
+    private void NotifyStateChanged() => OnAuthStateChanged?.Invoke();
 
     public async Task<bool> LoginAsync(string email, string password, bool rememberMe = true)
     {
@@ -184,6 +191,7 @@ public class AuthService
             await _js.InvokeVoidAsync("localStorage.removeItem", key);
             await _js.InvokeVoidAsync("sessionStorage.removeItem", key);
         }
+        NotifyStateChanged();
     }
 
     public async Task<HttpResponseMessage> SendAuthorizedAsync(Func<HttpRequestMessage> requestFactory)
@@ -248,6 +256,7 @@ public class AuthService
         await SetStorageAsync("hf_username", auth.User.Username);
         await SetStorageAsync("hf_email", auth.User.Email);
         await SetStorageAsync("hf_has_password", auth.User.HasPassword ? "true" : "false");
+        NotifyStateChanged();
     }
 
     private async Task SetStorageAsync(string key, string value)

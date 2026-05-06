@@ -1,239 +1,296 @@
 @page "/movie/{MovieId:int}"
 
-<div class="page-enter movie-detail-page">
+<div class="page-enter md-page">
     <AppNavbar OnLoggedOut="HandleLogout" />
 
     @if (IsLoading)
     {
-        <div class="movie-detail-loading">
-            <LoadingSpinner Size="large" Message="Loading movie..." />
+        <div class="md-loading">
+            <LoadingSpinner Size="large" Message="Loading..." />
         </div>
     }
     else if (Movie is null)
     {
-        <section class="movie-detail-empty">
-            <button class="detail-back-btn" @onclick="GoBack">Back</button>
-            <div class="empty-state">
+        <div class="md-shell" style="padding-top:120px;">
+            <button class="md-back-btn" @onclick="GoBack">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                Back to results
+            </button>
+            <div class="empty-state" style="margin-top:56px;">
                 <div class="empty-state-icon">?</div>
-                <p class="empty-state-text">Movie not found.</p>
+                <p class="empty-state-text">Title not found.</p>
             </div>
-        </section>
+        </div>
     }
     else
     {
-        <section class="movie-detail-hero">
-            <div class="movie-detail-hero__backdrop"
-                 style="@GetPosterBackdropStyle()"></div>
-            <div class="movie-detail-hero__shade"></div>
+        @* ── HERO ── *@
+        <div class="md-hero">
+            @if (!string.IsNullOrEmpty(Movie.PosterPath))
+            {
+                <div class="md-hero__backdrop"
+                     style="background-image:url('https://image.tmdb.org/t/p/w780@(Movie.PosterPath)')"></div>
+            }
+            <div class="md-hero__overlay"></div>
 
-            <div class="movie-detail-shell">
-                <button class="detail-back-btn" @onclick="GoBack">Back</button>
+            <div class="md-shell">
+                <button class="md-back-btn" @onclick="GoBack">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                    Back to results
+                </button>
 
-                <div class="movie-detail-layout">
-                    <aside class="movie-detail-poster-wrap">
+                <div class="md-layout">
+
+                    @* LEFT – poster *@
+                    <aside class="md-poster-col">
                         @if (!string.IsNullOrEmpty(Movie.PosterPath))
                         {
-                            <img class="movie-detail-poster"
+                            <img class="md-poster"
                                  src="https://image.tmdb.org/t/p/w500@(Movie.PosterPath)"
                                  alt="@Movie.Title" />
                         }
                         else
                         {
-                            <div class="movie-detail-poster movie-detail-poster--empty">
-                                <span>No poster</span>
-                            </div>
+                            <div class="md-poster md-poster--empty"><span>No poster</span></div>
                         }
                     </aside>
 
-                    <main class="movie-detail-main">
-                        <div class="movie-detail-kicker">
-                            <span>@FormatYear(Movie.ReleaseYear)</span>
+                    @* RIGHT – info *@
+                    <div class="md-info-col">
+
+                        @* Type badge + genre chips *@
+                        <div class="md-meta-top">
+                            <span class="md-type-badge md-type-badge--@(Movie.MediaType ?? "movie")">
+                                @(Movie.MediaType == "tv" ? "TV Series" : "Movie")
+                            </span>
+                            @foreach (var genre in Movie.Genres)
+                            {
+                                <span class="md-genre-pill">@genre</span>
+                            }
+                        </div>
+
+                        @* Title *@
+                        <h1 class="md-title">@Movie.Title</h1>
+
+                        @if (!string.IsNullOrWhiteSpace(Movie.OriginalTitle) && Movie.OriginalTitle != Movie.Title)
+                        {
+                            <p class="md-original-title">@Movie.OriginalTitle</p>
+                        }
+
+                        @* Tagline *@
+                        @if (!string.IsNullOrWhiteSpace(Movie.Tagline))
+                        {
+                            <p class="md-tagline">"@Movie.Tagline"</p>
+                        }
+
+                        @* Meta strip: year · runtime · language · status *@
+                        <div class="md-meta-strip">
+                            @if (Movie.ReleaseYear.HasValue)
+                            {
+                                <span>@Movie.ReleaseYear</span>
+                            }
                             @if (Movie.RuntimeMinutes.HasValue)
                             {
-                                <span>@Movie.RuntimeMinutes.Value min</span>
+                                <span>@FormatRuntime(Movie.RuntimeMinutes.Value)</span>
                             }
                             @if (!string.IsNullOrWhiteSpace(Movie.OriginalLanguage))
                             {
                                 <span>@Movie.OriginalLanguage!.ToUpperInvariant()</span>
                             }
-                        </div>
-
-                        <h1 class="movie-detail-title">@Movie.Title</h1>
-                        @if (!string.IsNullOrWhiteSpace(Movie.OriginalTitle) && Movie.OriginalTitle != Movie.Title)
-                        {
-                            <p class="movie-detail-original">@Movie.OriginalTitle</p>
-                        }
-
-                        @if (!string.IsNullOrWhiteSpace(Movie.Tagline))
-                        {
-                            <p class="movie-detail-tagline">"@Movie.Tagline"</p>
-                        }
-
-                        <div class="movie-detail-score-row">
-                            <div class="detail-score">
-                                <span class="detail-score__value">@FormatScore(Movie.VoteAverage)</span>
-                                <span class="detail-score__label">public rating</span>
-                            </div>
-                            <div class="detail-score">
-                                <span class="detail-score__value">@FormatVoteCount(Movie.VoteCount)</span>
-                                <span class="detail-score__label">votes</span>
-                            </div>
-                            <div class="detail-score">
-                                <span class="detail-score__value">@FormatPopularity(Movie.Popularity)</span>
-                                <span class="detail-score__label">heat</span>
-                            </div>
-                        </div>
-
-                        @if (Movie.Genres.Count > 0)
-                        {
-                            <div class="movie-detail-chips">
-                                @foreach (var genre in Movie.Genres)
-                                {
-                                    <span class="movie-detail-chip movie-detail-chip--genre">@genre</span>
-                                }
-                            </div>
-                        }
-
-                        <p class="movie-detail-overview">@GetOverview()</p>
-
-                        <div class="movie-detail-actions">
-                            @if (AuthService.IsLoggedIn)
+                            @if (!string.IsNullOrWhiteSpace(Movie.Status) && Movie.Status != "Released")
                             {
-                                <div class="detail-library-panel">
-                                    <div class="detail-panel-header">
-                                        <span>My tracking</span>
-                                        @if (!string.IsNullOrEmpty(SaveMessage))
-                                        {
-                                            <small>@SaveMessage</small>
-                                        }
-                                    </div>
+                                <span class="md-meta-status">@Movie.Status</span>
+                            }
+                        </div>
 
-                                    <div class="detail-status-grid">
-                                        @foreach (var option in StatusOptions)
-                                        {
-                                            <button class="detail-status-btn detail-status-btn--@option.Value @(SelectedStatus == option.Value ? "detail-status-btn--active" : "")"
-                                                    @onclick="() => SelectStatus(option.Value)"
-                                                    type="button">
-                                                @option.Label
-                                            </button>
-                                        }
-                                    </div>
-
-                                    <div class="detail-rating-row">
-                                        <span class="detail-field-label">Your rating</span>
-                                        <div class="detail-rating-buttons">
-                                            @for (var value = 1; value <= 10; value++)
-                                            {
-                                                var rating = value;
-                                                <button type="button"
-                                                        class="detail-rating-btn @(SelectedRating == rating ? "detail-rating-btn--active" : "")"
-                                                        @onclick="() => SelectRating(rating)">
-                                                    @rating
-                                                </button>
-                                            }
+                        @* Score row *@
+                        <div class="md-score-row">
+                            @if (Movie.VoteAverage.HasValue && Movie.VoteAverage > 0)
+                            {
+                                <div class="md-score-card md-score-card--rating">
+                                    <span class="md-score-card__star">★</span>
+                                    <div>
+                                        <div class="md-score-card__value-line">
+                                            <span class="md-score-card__value">@Movie.VoteAverage.Value.ToString("0.0")</span>
+                                            <span class="md-score-card__sublabel">/ 10</span>
                                         </div>
-                                        @if (SelectedRating.HasValue)
-                                        {
-                                            <button type="button" class="detail-text-btn" @onclick="ClearRating">Clear rating</button>
-                                        }
-                                    </div>
-
-                                    <label class="detail-notes-field">
-                                        <span class="detail-field-label">Private notes</span>
-                                        <textarea class="detail-notes-input"
-                                                  placeholder="What stayed with you?"
-                                                  maxlength="800"
-                                                  @bind="UserNotes"
-                                                  @bind:event="oninput"></textarea>
-                                    </label>
-
-                                    <div class="detail-panel-actions">
-                                        <button class="detail-save-btn" @onclick="SaveUserMovieAsync" disabled="@IsSaving">
-                                            @(IsSaving ? "Saving..." : "Save")
-                                        </button>
-                                        @if (HasUserEntry)
-                                        {
-                                            <button class="detail-remove-btn" @onclick="RemoveFromLibraryAsync" disabled="@IsSaving">
-                                                Remove from list
-                                            </button>
-                                        }
+                                        <span class="md-score-card__label">public rating</span>
                                     </div>
                                 </div>
                             }
-                            else
+                            @if (Movie.VoteCount.HasValue && Movie.VoteCount > 0)
                             {
-                                <div class="detail-library-panel detail-library-panel--signed-out">
-                                    <span>Sign in to track this film, rate it, and keep private notes.</span>
-                                    <a class="detail-save-btn" href="/login">Sign in</a>
+                                <div class="md-score-card">
+                                    <span class="md-score-card__value">@FormatVoteCount(Movie.VoteCount)</span>
+                                    <span class="md-score-card__label">votes</span>
+                                </div>
+                            }
+                            @if (Movie.Popularity.HasValue && Movie.Popularity > 0)
+                            {
+                                <div class="md-score-card">
+                                    <span class="md-score-card__value">@FormatPopularity(Movie.Popularity)</span>
+                                    <span class="md-score-card__label">popularity</span>
                                 </div>
                             }
                         </div>
-                    </main>
-                </div>
-            </div>
-        </section>
 
-        <section class="movie-detail-lower">
-            <div class="detail-section detail-section--profile">
-                <div class="detail-section-heading">
-                    <span>Dread profile</span>
-                    <small>derived from catalog signals</small>
-                </div>
-                <div class="dread-grid">
-                    <div class="dread-meter">
-                        <span>Audience confidence</span>
-                        <div class="dread-meter__track">
-                            <div class="dread-meter__fill" style="width: @GetConfidencePercent()%"></div>
-                        </div>
-                    </div>
-                    <div class="dread-meter">
-                        <span>Obscurity</span>
-                        <div class="dread-meter__track">
-                            <div class="dread-meter__fill dread-meter__fill--amber" style="width: @GetObscurityPercent()%"></div>
-                        </div>
-                    </div>
-                    <div class="dread-meter">
-                        <span>Runtime pressure</span>
-                        <div class="dread-meter__track">
-                            <div class="dread-meter__fill dread-meter__fill--muted" style="width: @GetRuntimePercent()%"></div>
-                        </div>
+                        @* Overview *@
+                        <p class="md-overview">@GetOverview()</p>
+
                     </div>
                 </div>
             </div>
+        </div>
 
-            @if (Movie.Keywords.Count > 0)
+        @* ── LOWER SECTION ── *@
+        <div class="md-lower">
+
+            @* Library / tracking panel *@
+            @if (AuthService.IsLoggedIn)
             {
-                <div class="detail-section">
-                    <div class="detail-section-heading">
-                        <span>Motifs</span>
-                        <small>@Movie.Keywords.Count keyword@(Movie.Keywords.Count == 1 ? "" : "s")</small>
-                    </div>
-                    <div class="movie-detail-chips movie-detail-chips--dense">
-                        @foreach (var keyword in Movie.Keywords.Take(28))
+                <div class="md-panel md-library">
+                    <div class="md-panel__header">
+                        <span class="md-panel__title">My tracking</span>
+                        @if (!string.IsNullOrEmpty(SaveMessage))
                         {
-                            <span class="movie-detail-chip">@keyword</span>
+                            <span class="md-save-msg @(SaveMessage == "Saved" ? "md-save-msg--ok" : "md-save-msg--err")">
+                                @SaveMessage
+                            </span>
+                        }
+                    </div>
+
+                    <div class="md-status-grid">
+                        @foreach (var option in StatusOptions)
+                        {
+                            <button class="md-status-btn md-status-btn--@option.Value @(SelectedStatus == option.Value ? "md-status-btn--active" : "")"
+                                    @onclick="() => SelectStatus(option.Value)" type="button">
+                                @option.Label
+                            </button>
+                        }
+                    </div>
+
+                    <div class="md-field-section">
+                        <span class="md-field-label">Your rating</span>
+                        <div class="md-rating-grid">
+                            @for (var v = 1; v <= 10; v++)
+                            {
+                                var rating = v;
+                                <button type="button"
+                                        class="md-rating-btn @(SelectedRating == rating ? "md-rating-btn--active" : "")"
+                                        @onclick="() => SelectRating(rating)">@rating</button>
+                            }
+                        </div>
+                        @if (SelectedRating.HasValue)
+                        {
+                            <button type="button" class="md-clear-link" @onclick="ClearRating">Clear rating</button>
+                        }
+                    </div>
+
+                    <label class="md-field-section">
+                        <span class="md-field-label">Private notes</span>
+                        <textarea class="md-notes-input"
+                                  placeholder="What stayed with you?"
+                                  maxlength="800"
+                                  @bind="UserNotes"
+                                  @bind:event="oninput"></textarea>
+                    </label>
+
+                    <div class="md-panel-actions">
+                        <button class="md-save-btn" @onclick="SaveUserMovieAsync" disabled="@IsSaving">
+                            @(IsSaving ? "Saving…" : "Save")
+                        </button>
+                        @if (HasUserEntry)
+                        {
+                            <button class="md-remove-btn" @onclick="RemoveFromLibraryAsync" disabled="@IsSaving">
+                                Remove from list
+                            </button>
                         }
                     </div>
                 </div>
             }
+            else
+            {
+                <div class="md-panel md-signin-panel">
+                    <span>Sign in to track this title, rate it, and keep private notes.</span>
+                    <a class="md-save-btn" href="/login">Sign in</a>
+                </div>
+            }
 
-            <div class="detail-section">
-                <div class="detail-section-heading">
-                    <span>External trail</span>
-                    <small>reference links</small>
+            @* Secondary panels column *@
+            <div class="md-secondary">
+
+                @* Dread profile *@
+                <div class="md-panel">
+                    <div class="md-panel__header">
+                        <span class="md-panel__title">Dread profile</span>
+                        <span class="md-panel__sub">derived from catalog signals</span>
+                    </div>
+                    <div class="md-dread-grid">
+                        <div class="md-dread-meter">
+                            <div class="md-dread-meter__top">
+                                <span>Audience confidence</span>
+                                <span class="md-dread-meter__pct">@GetConfidencePercent()%</span>
+                            </div>
+                            <div class="md-dread-meter__track">
+                                <div class="md-dread-meter__fill" style="width:@GetConfidencePercent()%"></div>
+                            </div>
+                        </div>
+                        <div class="md-dread-meter">
+                            <div class="md-dread-meter__top">
+                                <span>Obscurity</span>
+                                <span class="md-dread-meter__pct">@GetObscurityPercent()%</span>
+                            </div>
+                            <div class="md-dread-meter__track">
+                                <div class="md-dread-meter__fill md-dread-meter__fill--amber" style="width:@GetObscurityPercent()%"></div>
+                            </div>
+                        </div>
+                        <div class="md-dread-meter">
+                            <div class="md-dread-meter__top">
+                                <span>Runtime pressure</span>
+                                <span class="md-dread-meter__pct">@GetRuntimePercent()%</span>
+                            </div>
+                            <div class="md-dread-meter__track">
+                                <div class="md-dread-meter__fill md-dread-meter__fill--muted" style="width:@GetRuntimePercent()%"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="detail-link-row">
-                    @if (!string.IsNullOrWhiteSpace(Movie.ImdbId))
-                    {
-                        <a class="detail-link-btn" href="https://www.imdb.com/title/@Movie.ImdbId" target="_blank" rel="noopener noreferrer">
-                            IMDb
-                        </a>
-                    }
-                    <a class="detail-link-btn" href="https://www.themoviedb.org/search?query=@Uri.EscapeDataString(Movie.Title)" target="_blank" rel="noopener noreferrer">
-                        TMDB search
-                    </a>
+
+                @* Motifs / keywords *@
+                @if (Movie.Keywords.Count > 0)
+                {
+                    <div class="md-panel">
+                        <div class="md-panel__header">
+                            <span class="md-panel__title">Motifs</span>
+                            <span class="md-panel__sub">@Movie.Keywords.Count keyword@(Movie.Keywords.Count == 1 ? "" : "s")</span>
+                        </div>
+                        <div class="md-keywords">
+                            @foreach (var kw in Movie.Keywords.Take(32))
+                            {
+                                <span class="md-keyword">@kw</span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @* External links *@
+                <div class="md-panel">
+                    <div class="md-panel__header">
+                        <span class="md-panel__title">External links</span>
+                    </div>
+                    <div class="md-link-row">
+                        @if (!string.IsNullOrWhiteSpace(Movie.ImdbId))
+                        {
+                            <a class="md-link-btn" href="https://www.imdb.com/title/@Movie.ImdbId"
+                               target="_blank" rel="noopener noreferrer">IMDb ↗</a>
+                        }
+                        <a class="md-link-btn"
+                           href="https://www.themoviedb.org/search?query=@Uri.EscapeDataString(Movie.Title)"
+                           target="_blank" rel="noopener noreferrer">TMDB ↗</a>
+                    </div>
                 </div>
+
             </div>
-        </section>
+        </div>
     }
 </div>
