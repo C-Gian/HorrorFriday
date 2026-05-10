@@ -241,9 +241,9 @@ public partial class MovieDetail : ComponentBase
     protected static string GetStatusIcon(string status) => status switch
     {
         "to_watch" => "+",
-        "watching" => ">",
-        "watched" => "ok",
-        "dropped" => "x",
+        "watching" => "▶",
+        "watched" => "✓",
+        "dropped" => "×",
         _ => "-"
     };
 
@@ -287,6 +287,52 @@ public partial class MovieDetail : ComponentBase
 
     protected static string FormatMoney(long? amount) =>
         amount.HasValue && amount.Value > 0 ? $"${amount.Value:N0}" : "N/D";
+
+
+    protected static string FormatLanguage(string? language) =>
+        string.IsNullOrWhiteSpace(language) ? "N/D" : language.ToUpperInvariant();
+
+    protected static string FormatCountry(string? countries)
+    {
+        var first = SplitCsv(countries).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(first) ? "N/D" : first;
+    }
+
+    protected string GetHomepageLabel() =>
+        string.IsNullOrWhiteSpace(Movie?.Homepage) ? "N/D" : "official site ↗";
+
+    protected decimal GetObscurityValue()
+    {
+        var votes = Movie?.VoteCount ?? 0;
+        if (votes <= 0) return 0;
+        return Math.Round((decimal)Math.Log10(votes), 2);
+    }
+
+    protected string FormatRuntimePressure() =>
+        ((Movie?.RuntimeMinutes ?? 0) / 180.0m).ToString("0.00");
+
+    protected string GetRuntimeLabel()
+    {
+        var runtime = Movie?.RuntimeMinutes ?? 0;
+        if (runtime <= 0) return "Unknown";
+        if (runtime <= 95) return "Lean";
+        if (runtime <= 125) return "Optimal";
+        return "Marathon";
+    }
+
+    protected static string GetInitials(string value)
+    {
+        var initials = SplitCsv(value.Replace(" ", ","))
+            .Where(part => part.Length > 0)
+            .Take(2)
+            .Select(part => char.ToUpperInvariant(part[0]));
+
+        var result = string.Concat(initials);
+        return string.IsNullOrWhiteSpace(result) ? "?" : result;
+    }
+
+    protected static IReadOnlyList<string> SplitCsvForView(string? value) =>
+        SplitCsv(value).ToList();
 
     protected static string FormatCsvValue(string? value)
     {
