@@ -1,5 +1,14 @@
 # HorrorFriday — Project Context
 
+## Important exclusions
+Never read, index, summarize, edit, search, or open this folder:
+
+- C:\Users\Gian\source\repos\C-Gian\HorrorFriday\HorrorFriday.Importer\Data
+
+Treat it as out of scope for every task unless I explicitly mention it.
+
+---
+
 > **Come usare questo file**: Leggerlo all'inizio di ogni sessione per avere il contesto completo.
 > Quando l'utente dice "aggiorna il file .md", aggiorna questo file — mai duplicare, mai creare altri file.
 > Se una feature passa da TODO → DONE, spostala. File rinominato → aggiornalo qui. Mai duplicare, solo aggiornare.
