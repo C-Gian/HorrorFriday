@@ -1,34 +1,43 @@
 @using HorrorFriday.Web.Services
 
 <nav class="navbar">
-    <a href="/" class="navbar-brand">
-        <div class="navbar-logo">
-            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <mask id="fm">
-                        <rect width="22" height="18" rx="2" fill="white"/>
-                        <rect x="1" y="1.5" width="2.5" height="3" rx="0.6" fill="black"/>
-                        <rect x="1" y="7" width="2.5" height="3" rx="0.6" fill="black"/>
-                        <rect x="1" y="12.5" width="2.5" height="3" rx="0.6" fill="black"/>
-                        <rect x="18.5" y="1.5" width="2.5" height="3" rx="0.6" fill="black"/>
-                        <rect x="18.5" y="7" width="2.5" height="3" rx="0.6" fill="black"/>
-                        <rect x="18.5" y="12.5" width="2.5" height="3" rx="0.6" fill="black"/>
-                    </mask>
-                </defs>
-                <rect width="22" height="18" rx="2" fill="rgba(255,255,255,0.88)" mask="url(#fm)"/>
-            </svg>
-        </div>
-        <div class="navbar-wordmark">
-            <span class="navbar-wordmark__label">Horror</span>
-            <span class="navbar-wordmark__title">Friday</span>
-        </div>
+    <a href="/" class="navbar-brand" aria-label="Horror Friday home">
+        <span class="navbar-brand__horror">Horror</span>
+        <span class="navbar-brand__friday">Friday</span>
     </a>
+
+    <div class="navbar-nav" aria-label="Main navigation">
+        <NavLink href="/" Match="NavLinkMatch.All" class="navbar-nav__link">Discover</NavLink>
+        <NavLink href="/movies" class="navbar-nav__link">Movies</NavLink>
+        <NavLink href="/tv-shows" class="navbar-nav__link">TV Shows</NavLink>
+        <NavLink href="/people" class="navbar-nav__link">People</NavLink>
+        <NavLink href="/collections" class="navbar-nav__link">Collections</NavLink>
+        <NavLink href="/lists" class="navbar-nav__link">Lists</NavLink>
+        <NavLink href="/stats" class="navbar-nav__link">Stats</NavLink>
+    </div>
 
     <div class="navbar-right">
         @if (AuthService.IsLoggedIn && AuthService.CurrentUser is not null)
         {
+            <div class="navbar-actions" aria-label="User shortcuts">
+                <a class="navbar-icon-btn" href="/lists" aria-label="Saved lists">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+                    </svg>
+                </a>
+                <a class="navbar-icon-btn navbar-icon-btn--notify" href="/notifications" aria-label="Notifications">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <span class="navbar-notification-badge">3</span>
+                </a>
+            </div>
+
+            <div class="navbar-divider" aria-hidden="true"></div>
+
             <div class="user-menu" id="user-menu">
-                <button class="user-menu__trigger" @onclick="ToggleMenu" type="button">
+                <button class="user-menu__trigger" @onclick="ToggleMenu" type="button" aria-label="Open profile menu" aria-expanded="@IsMenuOpen">
                     <span class="user-menu__avatar">@GetInitials(AuthService.CurrentUser)</span>
                     <span class="user-menu__name">@AuthService.CurrentUser.Username</span>
                     <span class="user-menu__caret">▾</span>
@@ -55,6 +64,19 @@
         }
         else
         {
+            <div class="navbar-actions navbar-actions--guest" aria-hidden="true">
+                <span class="navbar-icon-btn navbar-icon-btn--disabled">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+                    </svg>
+                </span>
+                <span class="navbar-icon-btn navbar-icon-btn--disabled">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                </span>
+            </div>
             <a href="/login" class="navbar-signin-btn">Sign in</a>
         }
     </div>
