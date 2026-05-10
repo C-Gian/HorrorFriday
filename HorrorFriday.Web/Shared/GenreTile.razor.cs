@@ -11,10 +11,10 @@ public partial class GenreTile : ComponentBase
     public string Color { get; set; } = "#d44a4a";
 
     [Parameter, EditorRequired]
-    public string IconUrl { get; set; } = "/images/genres/icons/default.svg";
+    public string IconUrl { get; set; } = "/images/genres/eye.svg";
 
     [Parameter, EditorRequired]
-    public string BackgroundImageUrl { get; set; } = "/images/genres/backgrounds/default.jpg";
+    public string BackgroundImageUrl { get; set; } = "/images/genres/Horror.png";
 
     protected string Style =>
         $"--genre-color:{Color}; --genre-icon:url('{IconUrl}'); --genre-bg:url('{BackgroundImageUrl}');";
