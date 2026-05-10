@@ -35,6 +35,32 @@ public partial class MovieDetail : ComponentBase
         ("dropped", "Abbandonato")
     };
 
+    protected sealed record GenreTileModel(string Name, string Color, string IconUrl, string BackgroundImageUrl);
+
+    private static readonly IReadOnlyDictionary<string, GenreTileModel> GenreTiles =
+        new Dictionary<string, GenreTileModel>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Science Fiction"] = new("Science Fiction", "#16d9e3", "/images/genres/rocket.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Sci-Fi & Fantasy"] = new("Sci-Fi & Fantasy", "#16d9e3", "/images/genres/rocket.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Action"] = new("Action", "#ff941f", "/images/genres/crosshair.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Adventure"] = new("Adventure", "#42c46d", "/images/genres/compass.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Animation"] = new("Animation", "#6ab7ff", "/images/genres/clapperboard.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Comedy"] = new("Comedy", "#ffc02e", "/images/genres/theater.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Crime"] = new("Crime", "#9aa5ad", "/images/genres/fingerprint-pattern.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Documentary"] = new("Documentary", "#70d6bd", "/images/genres/book-search.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Drama"] = new("Drama", "#b690ff", "/images/genres/drama.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Family"] = new("Family", "#7ddf64", "/images/genres/users.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Fantasy"] = new("Fantasy", "#a66cff", "/images/genres/sparkles.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["History"] = new("History", "#c89b63", "/images/genres/landmark.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Horror"] = new("Horror", "#ff3e3e", "/images/genres/skull.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Music"] = new("Music", "#f062b8", "/images/genres/music.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Mystery"] = new("Mystery", "#a675ff", "/images/genres/scan-search.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Romance"] = new("Romance", "#ff5f93", "/images/genres/heart.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Thriller"] = new("Thriller", "#b372ff", "/images/genres/eye.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["War"] = new("War", "#9a8d6b", "/images/genres/shield.svg", "/images/genres/fingerprint-pattern.svg"),
+            ["Western"] = new("Western", "#d08b45", "/images/genres/hat-glasses.svg", "/images/genres/fingerprint-pattern.svg")
+        };
+
     protected override async Task OnParametersSetAsync()
     {
         IsLoading = true;
@@ -252,8 +278,28 @@ public partial class MovieDetail : ComponentBase
             ? "No overview available for this title."
             : Movie.Overview!;
 
+    protected IEnumerable<GenreTileModel> GetGenreTiles()
+    {
+        if (Movie?.Genres is null) yield break;
+
+        foreach (var genre in Movie.Genres.Take(6))
+        {
+            if (GenreTiles.TryGetValue(genre, out var tile))
+            {
+                yield return tile;
+                continue;
+            }
+
+            yield return new GenreTileModel(
+                genre,
+                "#d44a4a",
+                "/images/genres/eye.svg",
+                "/images/genres/fingerprint-pattern.svg");
+        }
+    }
+
     protected string? GetBackdropPath() =>
-        string.IsNullOrWhiteSpace(Movie?.BackdropPath) ? Movie?.PosterPath : Movie.BackdropPath;
+        string.IsNullOrWhiteSpace(Movie?.BackdropPath) ? null : Movie.BackdropPath;
 
     protected static string GetTmdbImageUrl(string? path, string size) =>
         string.IsNullOrWhiteSpace(path) ? "" : $"https://image.tmdb.org/t/p/{size}{path}";

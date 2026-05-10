@@ -1,6 +1,8 @@
 # .NET
 bin/
 obj/
+.verify_buildwwwroot/
+.verify_web_buildwwwroot/
 *.user
 *.suo
 .vs/

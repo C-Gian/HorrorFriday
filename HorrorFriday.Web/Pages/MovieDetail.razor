@@ -32,17 +32,10 @@
 
         <main class="md-frame">
             <section class="md-hero-panel">
-                <div class="md-kicker-row">
-                    @if (Movie.ReleaseYear.HasValue)
-                    {
-                        <span class="md-kicker">@Movie.ReleaseYear</span>
-                    }
-                    <span class="md-kicker md-kicker--accent">@(Movie.MediaType == "tv" ? "Serie TV" : "Film")</span>
-                    @foreach (var cert in Movie.Certifications.Take(1))
-                    {
-                        <span class="md-kicker">@cert.Certification</span>
-                    }
-                </div>
+                <button class="md-back-btn md-hero-back" @onclick="GoBack">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                    Torna alla home
+                </button>
 
                 <div class="md-title-block">
                     <h1 class="md-title">@Movie.Title</h1>
@@ -67,6 +60,19 @@
                     {
                         <div class="md-poster md-poster--empty"><span>No poster</span></div>
                     }
+
+                    <div class="md-score-panel md-score-panel--poster">
+                        <div class="md-score-main">
+                            <strong>@FormatScore(Movie.VoteAverage)</strong>
+                            <span class="md-star">★</span>
+                        </div>
+                        <small>/10 score</small>
+                        <dl>
+                            <div><dt>@FormatVoteCount(Movie.VoteCount)</dt><dd>Votes</dd></div>
+                            <div><dt>@FormatPopularity(Movie.Popularity)</dt><dd>Popularity</dd></div>
+                            <div><dt>@GetObscurityValue()</dt><dd>Obscurity <span>(log10)</span></dd></div>
+                        </dl>
+                    </div>
 
                     <div class="md-poster-actions">
                         <a class="md-outline-btn" href="@GetTmdbTitleUrl()" target="_blank" rel="noopener noreferrer">Trailer</a>
@@ -106,15 +112,18 @@
 
                     @if (Movie.Genres.Count > 0)
                     {
-                        <div class="md-chip-section">
+                        <section class="md-genre-section">
                             <span class="md-section-label">Genres</span>
-                            <div class="md-chip-row">
-                                @foreach (var genre in Movie.Genres.Take(10))
+                            <div class="md-genre-grid">
+                                @foreach (var genre in GetGenreTiles())
                                 {
-                                    <span class="md-chip">@genre</span>
+                                    <GenreTile Name="@genre.Name"
+                                               Color="@genre.Color"
+                                               IconUrl="@genre.IconUrl"
+                                               BackgroundImageUrl="@genre.BackgroundImageUrl" />
                                 }
                             </div>
-                        </div>
+                        </section>
                     }
 
                     @if (Movie.Keywords.Count > 0)
@@ -132,17 +141,41 @@
                 </div>
 
                 <aside class="md-right-rail">
-                    <div class="md-score-panel">
-                        <div class="md-score-main">
-                            <strong>@FormatScore(Movie.VoteAverage)</strong>
-                            <span class="md-star">★</span>
-                        </div>
-                        <small>/10 score</small>
-                        <dl>
-                            <div><dt>@FormatVoteCount(Movie.VoteCount)</dt><dd>Votes</dd></div>
-                            <div><dt>@FormatPopularity(Movie.Popularity)</dt><dd>Popularity</dd></div>
-                            <div><dt>@GetObscurityValue()</dt><dd>Obscurity <span>(log10)</span></dd></div>
-                        </dl>
+                    <div class="md-panel md-provider-panel">
+                        <div class="md-panel__hd"><h3>Watch providers</h3><span>@(Movie.WatchProviders.Count > 0 ? "Top" : "N/D")</span></div>
+                        @if (Movie.WatchProviders.Count > 0)
+                        {
+                            <div class="md-provider-tabs"><span>Stream</span><span>Rent</span><span>Buy</span><span>Ads</span></div>
+                            <div class="md-provider-list">
+                                @foreach (var provider in Movie.WatchProviders.Take(6))
+                                {
+                                    <div class="md-provider-card">
+                                        @if (!string.IsNullOrEmpty(provider.LogoPath))
+                                        {
+                                            <img src="@(GetTmdbImageUrl(provider.LogoPath, "w45"))" alt="" />
+                                        }
+                                        <div><strong>@provider.Name</strong><span>@FormatProviderType(provider.Type) · @provider.Region</span></div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="md-empty-copy">Nessun provider disponibile.</p>
+                        }
+                    </div>
+
+                    <div class="md-panel md-meter-card">
+                        <span class="md-section-label">Runtime pressure</span>
+                        <div class="md-ring" style="--pct:@GetRuntimePercent()"><strong>@GetRuntimePercent()%</strong><span>@(Movie.RuntimeMinutes ?? 0) / 180 min</span></div>
+                        <small>@GetRuntimeLabel()</small>
+                    </div>
+
+                    <div class="md-panel md-collection-card">
+                        <span class="md-section-label">Collection</span>
+                        <div class="md-collection-mark">✦</div>
+                        <strong>@(string.IsNullOrWhiteSpace(Movie.CollectionName) ? "Standalone title" : Movie.CollectionName)</strong>
+                        <small>@(Movie.CollectionId.HasValue ? "TMDB collection" : "No collection")</small>
                     </div>
 
                     <div class="md-panel md-track-panel">
@@ -211,21 +244,6 @@
                 </aside>
             </section>
 
-            <section class="md-cards-row">
-                <div class="md-panel md-meter-card">
-                    <span class="md-section-label">Runtime pressure</span>
-                    <div class="md-ring" style="--pct:@GetRuntimePercent()"><strong>@GetRuntimePercent()%</strong><span>@(Movie.RuntimeMinutes ?? 0) / 180 min</span></div>
-                    <small>@GetRuntimeLabel()</small>
-                </div>
-
-                <div class="md-panel md-collection-card">
-                    <span class="md-section-label">Collection</span>
-                    <div class="md-collection-mark">✦</div>
-                    <strong>@(string.IsNullOrWhiteSpace(Movie.CollectionName) ? "Standalone title" : Movie.CollectionName)</strong>
-                    <small>@(Movie.CollectionId.HasValue ? "TMDB collection" : "No collection")</small>
-                </div>
-            </section>
-
             <section class="md-lower-grid">
                 @if (HasPeopleCards())
                 {
@@ -265,25 +283,6 @@
                     </div>
                 }
 
-                @if (Movie.WatchProviders.Count > 0)
-                {
-                    <div class="md-panel md-provider-panel">
-                        <div class="md-panel__hd"><h3>Watch providers</h3><span>View all</span></div>
-                        <div class="md-provider-tabs"><span>Stream</span><span>Rent</span><span>Buy</span><span>Ads</span></div>
-                        <div class="md-provider-list">
-                            @foreach (var provider in Movie.WatchProviders.Take(6))
-                            {
-                                <div class="md-provider-card">
-                                    @if (!string.IsNullOrEmpty(provider.LogoPath))
-                                    {
-                                        <img src="@(GetTmdbImageUrl(provider.LogoPath, "w45"))" alt="" />
-                                    }
-                                    <div><strong>@provider.Name</strong><span>@FormatProviderType(provider.Type) · @provider.Region</span></div>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
             </section>
 
             <section class="md-footer-stats">
