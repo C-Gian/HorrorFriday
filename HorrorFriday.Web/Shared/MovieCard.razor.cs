@@ -45,6 +45,8 @@ public partial class MovieCard : ComponentBase
 
     protected Task HandleToggleStatusPicker() => OnToggleStatusPicker.InvokeAsync(Movie.Id);
 
+    protected Task HandleCloseStatusPicker() => OnCloseStatusPicker.InvokeAsync();
+
     protected Task HandleMouseLeave() =>
         IsStatusPickerOpen ? OnCloseStatusPicker.InvokeAsync() : Task.CompletedTask;
 

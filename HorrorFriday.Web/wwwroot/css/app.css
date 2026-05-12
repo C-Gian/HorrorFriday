@@ -1235,7 +1235,10 @@ select {
 .status-backdrop {
     position: fixed;
     inset: 0;
+    border: 0;
+    background: transparent;
     z-index: 49;
+    cursor: default;
 }
 
 /* ── Status badge & picker ── */
@@ -1247,6 +1250,8 @@ select {
 }
 
 .poster-status-btn {
+    position: relative;
+    z-index: 52;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1260,19 +1265,38 @@ select {
     text-transform: uppercase;
     cursor: pointer;
     backdrop-filter: blur(8px);
-    transition: opacity 0.2s, transform 0.15s;
+    transition: opacity 0.2s, transform 0.15s, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
     line-height: 1.4;
     white-space: nowrap;
 }
 
 .poster-status-btn--empty {
-    background: rgba(0, 0, 0, 0.55);
-    color: var(--text-muted);
-    opacity: 0;
+    width: 38px;
+    height: 38px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    border: 1px solid rgba(232,224,212,0.22);
+    border-radius: 50%;
+    background: rgba(9,8,7,0.82);
+    color: rgba(232,224,212,0.78);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.42);
+    opacity: 0.88;
 }
 
 .poster-card:hover .poster-status-btn--empty {
     opacity: 1;
+}
+
+.poster-status-btn--empty:hover,
+.poster-status-btn--empty:focus-visible {
+    border-color: rgba(232,224,212,0.38);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.poster-status-btn--empty svg {
+    display: block;
 }
 
 .poster-status-btn--to_watch {
@@ -1303,13 +1327,13 @@ select {
 
 .poster-status-picker {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 8px);
     left: 0;
-    min-width: 120px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    min-width: 150px;
+    background: rgba(14,13,12,0.98);
+    border: 1px solid rgba(232,224,212,0.12);
+    border-radius: 10px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.62);
     z-index: 51;
     overflow: hidden;
     animation: selectFadeIn 0.15s ease;
@@ -1929,6 +1953,46 @@ select {
 
 .md-rail-actions {
     margin-top: 0;
+}
+
+.md-rail-actions .md-outline-btn {
+    position: relative;
+    overflow: hidden;
+    gap: 8px;
+    min-height: 44px;
+    border-color: rgba(232,224,212,0.16);
+    background:
+        linear-gradient(180deg, rgba(23,21,19,0.76), rgba(7,6,5,0.68)),
+        radial-gradient(circle at 20% 0%, rgba(212,74,74,0.16), transparent 44%);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.045);
+    transition: border-color 0.22s ease, color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.md-rail-actions .md-outline-btn::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.13) 42%, transparent 68%);
+    transform: translateX(-130%);
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+.md-rail-actions .md-outline-btn svg,
+.md-rail-actions .md-outline-btn span {
+    position: relative;
+    z-index: 1;
+}
+
+.md-rail-actions .md-outline-btn:hover {
+    border-color: rgba(212,74,74,0.48);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.36), 0 0 22px rgba(155,28,28,0.14), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.md-rail-actions .md-outline-btn:hover::before {
+    transform: translateX(130%);
 }
 
 .md-outline-btn {

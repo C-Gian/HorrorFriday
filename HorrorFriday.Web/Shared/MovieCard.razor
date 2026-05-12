@@ -54,7 +54,12 @@
     @if (IsLoggedIn)
     {
         <div class="poster-status" @onclick="HandleStatusAreaClick" @onclick:stopPropagation="true">
-            <button class="poster-status-btn @(HasStatus ? $"poster-status-btn--{Status}" : "poster-status-btn--empty")"
+            @if (IsStatusPickerOpen)
+            {
+                <button class="status-backdrop" type="button" aria-label="Close watchlist menu" @onclick="HandleCloseStatusPicker"></button>
+            }
+
+            <button class="poster-status-btn @(HasStatus ? $"poster-status-btn--{Status}" : "poster-status-btn--empty poster-status-btn--save")"
                     @onclick="HandleToggleStatusPicker"
                     title="@(HasStatus ? GetStatusLabel(Status!) : "Add to list")">
                 @if (HasStatus)
@@ -63,7 +68,9 @@
                 }
                 else
                 {
-                    <span class="poster-status-add">+</span>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
                 }
             </button>
 
