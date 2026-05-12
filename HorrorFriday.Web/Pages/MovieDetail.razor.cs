@@ -25,14 +25,14 @@ public partial class MovieDetail : ComponentBase
     protected string SelectedStatus { get; set; } = "to_watch";
     protected int? SelectedRating { get; set; }
     protected string UserNotes { get; set; } = "";
-    protected string? SaveMessage { get; set; }
+    protected string? ReviewMessage { get; set; }
 
     protected static readonly List<(string Value, string Label)> StatusOptions = new()
     {
-        ("to_watch", "Da guardare"),
-        ("watching", "In visione"),
-        ("watched", "Visto"),
-        ("dropped", "Abbandonato")
+        ("to_watch", "To Watch"),
+        ("watching", "Watching"),
+        ("watched", "Watched"),
+        ("dropped", "Dropped")
     };
 
     protected sealed record GenreTileModel(string Name, string Color, string IconUrl, string BackgroundImageUrl);
@@ -64,7 +64,7 @@ public partial class MovieDetail : ComponentBase
     protected override async Task OnParametersSetAsync()
     {
         IsLoading = true;
-        SaveMessage = null;
+        ReviewMessage = null;
 
         await AuthService.InitializeAsync();
         await LoadMovieAsync();
@@ -141,27 +141,37 @@ public partial class MovieDetail : ComponentBase
     {
         SelectedStatus = status;
         IsListMenuOpen = false;
-        SaveMessage = null;
+        ReviewMessage = null;
+    }
+
+    protected async Task SelectStatusAndSaveAsync(string status)
+    {
+        SelectStatus(status);
+        await SaveUserMovieAsync(showReviewMessage: false);
     }
 
     protected void SelectRating(int rating)
     {
         SelectedRating = SelectedRating == rating ? null : rating;
-        SaveMessage = null;
+        ReviewMessage = null;
     }
 
     protected void ClearRating()
     {
         SelectedRating = null;
-        SaveMessage = null;
+        ReviewMessage = null;
     }
 
-    protected async Task SaveUserMovieAsync()
+    protected Task SaveUserMovieAsync() => SaveUserMovieAsync(showReviewMessage: true);
+
+    private async Task SaveUserMovieAsync(bool showReviewMessage)
     {
         if (!AuthService.IsLoggedIn) return;
 
         IsSaving = true;
-        SaveMessage = null;
+        IsListMenuOpen = false;
+        if (showReviewMessage)
+            ReviewMessage = null;
 
         try
         {
@@ -185,12 +195,14 @@ public partial class MovieDetail : ComponentBase
             if (response.IsSuccessStatusCode)
             {
                 HasUserEntry = true;
-                SaveMessage = "Salvato";
+                if (showReviewMessage)
+                    ReviewMessage = "Saved";
             }
             else
             {
                 var body = await response.Content.ReadAsStringAsync();
-                SaveMessage = "Errore salvataggio";
+                if (showReviewMessage)
+                    ReviewMessage = "Save failed";
                 Console.WriteLine($"[MovieDetail] Save failed {response.StatusCode}: {body}");
             }
         }
@@ -205,7 +217,8 @@ public partial class MovieDetail : ComponentBase
         if (!AuthService.IsLoggedIn) return;
 
         IsSaving = true;
-        SaveMessage = null;
+        IsListMenuOpen = false;
+        ReviewMessage = null;
 
         try
         {
@@ -218,11 +231,12 @@ public partial class MovieDetail : ComponentBase
                 SelectedStatus = "to_watch";
                 SelectedRating = null;
                 UserNotes = "";
-                SaveMessage = "Rimosso";
+                ReviewMessage = null;
             }
             else
             {
-                SaveMessage = "Errore rimozione";
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[MovieDetail] Remove failed {response.StatusCode}: {body}");
             }
         }
         finally
@@ -251,6 +265,11 @@ public partial class MovieDetail : ComponentBase
         IsListMenuOpen = !IsListMenuOpen;
     }
 
+    protected void CloseListMenu()
+    {
+        IsListMenuOpen = false;
+    }
+
     protected void SetTab(string tab) => ActiveTab = tab;
 
     protected string GetScoreColorVar()
@@ -262,16 +281,8 @@ public partial class MovieDetail : ComponentBase
     }
 
     protected string GetSelectedStatusLabel() =>
-        StatusOptions.FirstOrDefault(o => o.Value == SelectedStatus).Label ?? "Scegli lista";
+        StatusOptions.FirstOrDefault(o => o.Value == SelectedStatus).Label ?? "Choose list";
 
-    protected static string GetStatusIcon(string status) => status switch
-    {
-        "to_watch" => "+",
-        "watching" => "▶",
-        "watched" => "✓",
-        "dropped" => "×",
-        _ => "-"
-    };
 
     protected string GetOverview() =>
         string.IsNullOrWhiteSpace(Movie?.Overview)
@@ -325,6 +336,9 @@ public partial class MovieDetail : ComponentBase
     protected static string FormatScore(decimal? score) =>
         score.HasValue && score > 0 ? score.Value.ToString("0.0") : "N/A";
 
+    protected bool IsScoreStarActive(int star) =>
+        Movie?.VoteAverage is > 0 && star <= (int)Math.Round(Movie.VoteAverage.Value, MidpointRounding.AwayFromZero);
+
     protected static string FormatVoteCount(int? votes) =>
         votes.HasValue ? votes.Value.ToString("N0") : "N/A";
 
@@ -332,20 +346,20 @@ public partial class MovieDetail : ComponentBase
         popularity.HasValue ? popularity.Value.ToString("0") : "N/A";
 
     protected static string FormatMoney(long? amount) =>
-        amount.HasValue && amount.Value > 0 ? $"${amount.Value:N0}" : "N/D";
+        amount.HasValue && amount.Value > 0 ? $"${amount.Value:N0}" : "N/A";
 
 
     protected static string FormatLanguage(string? language) =>
-        string.IsNullOrWhiteSpace(language) ? "N/D" : language.ToUpperInvariant();
+        string.IsNullOrWhiteSpace(language) ? "N/A" : language.ToUpperInvariant();
 
     protected static string FormatCountry(string? countries)
     {
         var first = SplitCsv(countries).FirstOrDefault();
-        return string.IsNullOrWhiteSpace(first) ? "N/D" : first;
+        return string.IsNullOrWhiteSpace(first) ? "N/A" : first;
     }
 
     protected string GetHomepageLabel() =>
-        string.IsNullOrWhiteSpace(Movie?.Homepage) ? "N/D" : "official site ↗";
+        string.IsNullOrWhiteSpace(Movie?.Homepage) ? "N/A" : "Official site";
 
     protected decimal GetObscurityValue()
     {
@@ -382,39 +396,36 @@ public partial class MovieDetail : ComponentBase
 
     protected static string FormatCsvValue(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "N/D";
+        if (string.IsNullOrWhiteSpace(value)) return "N/A";
         var parts = SplitCsv(value).Take(4).ToList();
-        return parts.Count == 0 ? "N/D" : string.Join(", ", parts);
+        return parts.Count == 0 ? "N/A" : string.Join(", ", parts);
     }
 
-    protected static string FormatProviderType(string type) => type switch
-    {
-        "stream" => "Streaming",
-        "ads" => "Gratis con pubblicità",
-        "rent" => "Noleggio",
-        "buy" => "Acquisto",
-        _ => type
-    };
+    protected IEnumerable<MovieWatchProviderDto> GetWatchProviders() =>
+        Movie?.WatchProviders
+            .GroupBy(provider => provider.Id)
+            .Select(group => group.First())
+        ?? Enumerable.Empty<MovieWatchProviderDto>();
 
     protected bool IsPositiveSaveMessage() =>
-        SaveMessage is "Salvato" or "Rimosso";
+        ReviewMessage is "Saved";
 
     protected IEnumerable<(string Role, string Name)> GetPeopleCards()
     {
         foreach (var name in SplitCsv(Movie?.Director).Take(3))
-            yield return (Movie?.MediaType == "tv" ? "Creator" : "Regia", name);
+            yield return (Movie?.MediaType == "tv" ? "Creator" : "Director", name);
 
         foreach (var name in SplitCsv(Movie?.CastList).Take(6))
             yield return ("Cast", name);
 
         foreach (var name in SplitCsv(Movie?.Writers).Take(3))
-            yield return ("Sceneggiatura", name);
+            yield return ("Writing", name);
 
         foreach (var name in SplitCsv(Movie?.DirectorOfPhotography).Take(2))
-            yield return ("Fotografia", name);
+            yield return ("Cinematography", name);
 
         foreach (var name in SplitCsv(Movie?.MusicComposer).Take(2))
-            yield return ("Musica", name);
+            yield return ("Music", name);
     }
 
     protected bool HasPeopleCards() => GetPeopleCards().Any();
