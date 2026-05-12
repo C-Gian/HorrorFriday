@@ -3,7 +3,19 @@ window.hfSaveState  = (k, v) => sessionStorage.setItem(k, v);
 window.hfLoadState  = (k)    => sessionStorage.getItem(k);
 window.hfClearState = (k)    => sessionStorage.removeItem(k);
 window.hfScrollY    = ()     => window.scrollY;
-window.hfScrollTo   = (y)    => window.scrollTo({ top: y, behavior: 'instant' });
+window.hfScrollTo   = (y)    => window.scrollTo({ top: Number(y) || 0, behavior: 'auto' });
+window.hfRestoreScroll = (y) => {
+    const target = Math.max(0, Number(y) || 0);
+    const apply = () => window.scrollTo({ top: target, behavior: 'auto' });
+
+    requestAnimationFrame(() => {
+        apply();
+        setTimeout(apply, 50);
+        setTimeout(apply, 150);
+        setTimeout(apply, 300);
+        setTimeout(apply, 600);
+    });
+};
 
 window.getBrowserRegion = function () {
     var lang = (navigator.languages && navigator.languages[0]) || navigator.language || '';

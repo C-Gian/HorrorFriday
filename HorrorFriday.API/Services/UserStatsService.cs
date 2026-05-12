@@ -19,7 +19,12 @@ public class UserStatsService
 
         // Status counts
         await using (var cmd = new NpgsqlCommand(
-            "SELECT status, COUNT(*) FROM user_movies WHERE user_id = $1 GROUP BY status", conn))
+            @"SELECT um.status, COUNT(*)
+              FROM user_movies um
+              JOIN movies m ON m.id = um.movie_id
+              WHERE um.user_id = $1
+                AND COALESCE(m.is_adult, false) = false
+              GROUP BY um.status", conn))
         {
             cmd.Parameters.AddWithValue(userId);
             await using var r = await cmd.ExecuteReaderAsync();
@@ -40,9 +45,13 @@ public class UserStatsService
 
         // Rating distribution + average
         await using (var cmd = new NpgsqlCommand(
-            @"SELECT user_rating, COUNT(*) FROM user_movies
-              WHERE user_id = $1 AND user_rating IS NOT NULL
-              GROUP BY user_rating ORDER BY user_rating", conn))
+            @"SELECT um.user_rating, COUNT(*)
+              FROM user_movies um
+              JOIN movies m ON m.id = um.movie_id
+              WHERE um.user_id = $1
+                AND um.user_rating IS NOT NULL
+                AND COALESCE(m.is_adult, false) = false
+              GROUP BY um.user_rating ORDER BY um.user_rating", conn))
         {
             cmd.Parameters.AddWithValue(userId);
             await using var r = await cmd.ExecuteReaderAsync();
@@ -63,9 +72,11 @@ public class UserStatsService
         await using (var cmd = new NpgsqlCommand(
             @"SELECT g.name, COUNT(*) AS cnt
               FROM user_movies um
+              JOIN movies m ON m.id = um.movie_id
               JOIN movie_genres mg ON mg.movie_id = um.movie_id
               JOIN genres g ON g.id = mg.genre_id
               WHERE um.user_id = $1
+                AND COALESCE(m.is_adult, false) = false
               GROUP BY g.name ORDER BY cnt DESC LIMIT 8", conn))
         {
             cmd.Parameters.AddWithValue(userId);
@@ -82,11 +93,14 @@ public class UserStatsService
 
         // Monthly activity — last 13 months
         await using (var cmd = new NpgsqlCommand(
-            @"SELECT EXTRACT(YEAR FROM added_at)::int,
-                     EXTRACT(MONTH FROM added_at)::int,
+            @"SELECT EXTRACT(YEAR FROM um.added_at)::int,
+                     EXTRACT(MONTH FROM um.added_at)::int,
                      COUNT(*)::int
-              FROM user_movies
-              WHERE user_id = $1 AND added_at >= NOW() - INTERVAL '13 months'
+              FROM user_movies um
+              JOIN movies m ON m.id = um.movie_id
+              WHERE um.user_id = $1
+                AND um.added_at >= NOW() - INTERVAL '13 months'
+                AND COALESCE(m.is_adult, false) = false
               GROUP BY 1, 2 ORDER BY 1, 2", conn))
         {
             cmd.Parameters.AddWithValue(userId);

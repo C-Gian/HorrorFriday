@@ -32,6 +32,7 @@ public class MovieService
         int paramIndex = 1;
 
         // --- Build WHERE conditions based on provided filters ---
+        conditions.Add("COALESCE(m.is_adult, false) = false");
 
         // Text search on title
         if (!string.IsNullOrWhiteSpace(request.Query))
@@ -326,7 +327,8 @@ public class MovieService
                    m.production_countries, m.media_type,
                    m.embedding <=> $1 AS distance
             FROM movies m
-            WHERE m.embedding IS NOT NULL
+            WHERE COALESCE(m.is_adult, false) = false
+              AND m.embedding IS NOT NULL
             ORDER BY m.embedding <=> $1
             LIMIT $2";
 
@@ -361,7 +363,8 @@ public class MovieService
         const string sql = @"
             SELECT id, title, release_year, media_type, poster_path
             FROM movies
-            WHERE title ILIKE $1
+            WHERE COALESCE(is_adult, false) = false
+              AND title ILIKE $1
             ORDER BY popularity DESC NULLS LAST
             LIMIT $2";
 
@@ -398,7 +401,13 @@ public class MovieService
                    m.collection_name, m.spoken_languages, m.production_companies,
                    m.production_countries, m.media_type
             FROM movies m
-            WHERE m.id != $1 AND m.embedding IS NOT NULL
+            WHERE m.id != $1
+              AND COALESCE(m.is_adult, false) = false
+              AND m.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM movies source
+                  WHERE source.id = $1 AND COALESCE(source.is_adult, false) = false
+              )
             ORDER BY m.embedding <=> (SELECT embedding FROM movies WHERE id = $1)
             LIMIT $2";
 
@@ -431,7 +440,8 @@ public class MovieService
                    m.collection_name, m.spoken_languages, m.production_companies,
                    m.production_countries, m.media_type
             FROM movies m
-            WHERE m.id = $1";
+            WHERE m.id = $1
+              AND COALESCE(m.is_adult, false) = false";
 
         MovieDto? movie = null;
         {
@@ -461,7 +471,11 @@ public class MovieService
         var regions = new List<string>();
         await using var conn = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(
-            "SELECT DISTINCT region FROM movie_watch_providers ORDER BY region", conn);
+            @"SELECT DISTINCT mwp.region
+              FROM movie_watch_providers mwp
+              JOIN movies m ON m.id = mwp.movie_id
+              WHERE COALESCE(m.is_adult, false) = false
+              ORDER BY mwp.region", conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
             regions.Add(reader.GetString(0));
@@ -515,7 +529,9 @@ public class MovieService
                 SELECT wp.id, wp.provider_name, wp.logo_path
                 FROM watch_providers wp
                 JOIN movie_watch_providers mwp ON mwp.provider_id = wp.id
+                JOIN movies m ON m.id = mwp.movie_id
                 WHERE mwp.region = $1
+                  AND COALESCE(m.is_adult, false) = false
                 GROUP BY wp.id, wp.provider_name, wp.logo_path
                 ORDER BY COUNT(DISTINCT mwp.movie_id) DESC, wp.provider_name";
         }
@@ -524,6 +540,10 @@ public class MovieService
             sql = @"
                 SELECT wp.id, wp.provider_name, wp.logo_path
                 FROM watch_providers wp
+                JOIN movie_watch_providers mwp ON mwp.provider_id = wp.id
+                JOIN movies m ON m.id = mwp.movie_id
+                WHERE COALESCE(m.is_adult, false) = false
+                GROUP BY wp.id, wp.provider_name, wp.logo_path
                 ORDER BY wp.provider_name";
         }
 
@@ -597,7 +617,11 @@ public class MovieService
         var allCerts = new List<string>();
         await using var conn = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(
-            "SELECT DISTINCT certification FROM movie_certifications WHERE region = $1", conn);
+            @"SELECT DISTINCT mc.certification
+              FROM movie_certifications mc
+              JOIN movies m ON m.id = mc.movie_id
+              WHERE mc.region = $1
+                AND COALESCE(m.is_adult, false) = false", conn);
         cmd.Parameters.AddWithValue(region);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -621,7 +645,13 @@ public class MovieService
     {
         var genres = new List<string>();
         await using var conn = await _dataSource.OpenConnectionAsync();
-        await using var cmd = new NpgsqlCommand("SELECT name FROM genres ORDER BY name", conn);
+        await using var cmd = new NpgsqlCommand(
+            @"SELECT DISTINCT g.name
+              FROM genres g
+              JOIN movie_genres mg ON mg.genre_id = g.id
+              JOIN movies m ON m.id = mg.movie_id
+              WHERE COALESCE(m.is_adult, false) = false
+              ORDER BY g.name", conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {

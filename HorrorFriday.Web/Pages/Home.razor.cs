@@ -203,7 +203,9 @@ public partial class Home : ComponentBase
     // ─────────────── Lifecycle ───────────────
 
     private bool _pendingScrollRestore;
+    private bool _restoredCachedResults;
     private double _scrollRestoreY;
+    private const int FilterStateVersion = 2;
 
     protected override async Task OnInitializedAsync()
     {
@@ -216,7 +218,23 @@ public partial class Home : ComponentBase
             await TryPreSelectRegionFromBrowserAsync();
         }
 
+        if (restored && _restoredCachedResults)
+        {
+            _pendingScrollRestore = true;
+            return;
+        }
+
+        if (restored)
+        {
+            await LoadFilterCatalogsForRestoredStateAsync();
+        }
+
         await ExecuteSearch();
+
+        if (restored)
+        {
+            _pendingScrollRestore = true;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -224,7 +242,7 @@ public partial class Home : ComponentBase
         if (_pendingScrollRestore)
         {
             _pendingScrollRestore = false;
-            try { await JS.InvokeVoidAsync("hfScrollTo", _scrollRestoreY); }
+            try { await JS.InvokeVoidAsync("hfRestoreScroll", _scrollRestoreY); }
             catch { }
         }
     }
@@ -259,26 +277,42 @@ public partial class Home : ComponentBase
             IncludeUpcoming = state.IncludeUpcoming;
             CurrentPage     = state.CurrentPage;
 
-            await Task.WhenAll(LoadGenres(), LoadRegions());
+            SelectedRegion         = state.SelectedRegion;
+            SelectedProviderIds    = state.SelectedProviderIds.ToHashSet();
+            SelectedCertifications = state.SelectedCertifications.ToHashSet();
 
-            if (!string.IsNullOrEmpty(state.SelectedRegion))
+            AllGenres         = state.AllGenres;
+            AllRegions        = state.AllRegions;
+            AllProviders      = state.AllProviders;
+            AllCertifications = state.AllCertifications;
+            Movies            = state.Movies;
+            TotalCount        = state.TotalCount;
+            TotalPages        = state.TotalPages;
+            MovieStatuses     = state.MovieStatuses;
+            _restoredCachedResults = state.CacheVersion == FilterStateVersion && Movies is not null;
+            if (!_restoredCachedResults)
             {
-                SelectedRegion = state.SelectedRegion;
-                await Task.WhenAll(LoadProviders(), LoadCertifications());
-                SelectedProviderIds    = state.SelectedProviderIds.ToHashSet();
-                SelectedCertifications = state.SelectedCertifications.ToHashSet();
-            }
-            else
-            {
-                await LoadProviders();
+                Movies = null;
+                TotalCount = 0;
+                TotalPages = 0;
+                MovieStatuses.Clear();
             }
 
-            _pendingScrollRestore = true;
-            _scrollRestoreY       = state.ScrollY;
+            _scrollRestoreY = state.ScrollY;
 
             return true;
         }
         catch { return false; }
+    }
+
+    private async Task LoadFilterCatalogsForRestoredStateAsync()
+    {
+        await Task.WhenAll(LoadGenres(), LoadRegions());
+
+        if (!string.IsNullOrEmpty(SelectedRegion))
+            await Task.WhenAll(LoadProviders(), LoadCertifications());
+        else
+            await LoadProviders();
     }
 
     private async Task TryPreSelectRegionFromBrowserAsync()
@@ -789,6 +823,7 @@ public partial class Home : ComponentBase
         {
             var state = new FilterState
             {
+                CacheVersion    = FilterStateVersion,
                 SearchQuery     = SearchQuery,
                 IsAiMode        = IsAiMode,
                 IsAdvancedOpen  = IsAdvancedOpen,
@@ -807,6 +842,14 @@ public partial class Home : ComponentBase
                 SelectedRegion  = SelectedRegion,
                 SelectedProviderIds    = SelectedProviderIds.ToList(),
                 SelectedCertifications = SelectedCertifications.ToList(),
+                AllGenres         = AllGenres,
+                AllRegions        = AllRegions,
+                AllProviders      = AllProviders,
+                AllCertifications = AllCertifications,
+                Movies            = Movies,
+                TotalCount        = TotalCount,
+                TotalPages        = TotalPages,
+                MovieStatuses     = MovieStatuses,
                 CurrentPage     = CurrentPage,
                 ScrollY         = await JS.InvokeAsync<double>("hfScrollY")
             };
@@ -891,6 +934,7 @@ public partial class Home : ComponentBase
 
     private class FilterState
     {
+        public int CacheVersion { get; set; }
         public string? SearchQuery { get; set; }
         public bool IsAiMode { get; set; }
         public bool IsAdvancedOpen { get; set; }
@@ -909,6 +953,14 @@ public partial class Home : ComponentBase
         public string? SelectedRegion { get; set; }
         public List<int> SelectedProviderIds { get; set; } = [];
         public List<string> SelectedCertifications { get; set; } = [];
+        public List<string> AllGenres { get; set; } = [];
+        public List<string> AllRegions { get; set; } = [];
+        public List<ProviderDto> AllProviders { get; set; } = [];
+        public List<string> AllCertifications { get; set; } = [];
+        public List<MovieDto>? Movies { get; set; }
+        public int TotalCount { get; set; }
+        public int TotalPages { get; set; }
+        public Dictionary<int, string> MovieStatuses { get; set; } = new();
         public int CurrentPage { get; set; } = 1;
         public double ScrollY { get; set; }
     }

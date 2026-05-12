@@ -17,7 +17,13 @@ public class UserMovieService
         if (movieIds.Count == 0) return new();
 
         var placeholders = string.Join(", ", movieIds.Select((_, i) => $"${i + 2}"));
-        var sql = $"SELECT movie_id, status FROM user_movies WHERE user_id = $1 AND movie_id IN ({placeholders})";
+        var sql = $@"
+            SELECT um.movie_id, um.status
+            FROM user_movies um
+            JOIN movies m ON m.id = um.movie_id
+            WHERE um.user_id = $1
+              AND COALESCE(m.is_adult, false) = false
+              AND um.movie_id IN ({placeholders})";
 
         await using var conn = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(sql, conn);
@@ -37,7 +43,9 @@ public class UserMovieService
     {
         const string sql = @"
             INSERT INTO user_movies (user_id, movie_id, status, added_at, updated_at)
-            VALUES ($1, $2, $3, NOW(), NOW())
+            SELECT $1, m.id, $3, NOW(), NOW()
+            FROM movies m
+            WHERE m.id = $2 AND COALESCE(m.is_adult, false) = false
             ON CONFLICT (user_id, movie_id) DO UPDATE SET status = $3, updated_at = NOW()";
 
         await using var conn = await _dataSource.OpenConnectionAsync();
@@ -52,7 +60,9 @@ public class UserMovieService
     {
         const string sql = @"
             INSERT INTO user_movies (user_id, movie_id, status, user_rating, notes, added_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            SELECT $1, m.id, $3, $4, $5, NOW(), NOW()
+            FROM movies m
+            WHERE m.id = $2 AND COALESCE(m.is_adult, false) = false
             ON CONFLICT (user_id, movie_id) DO UPDATE SET
                 status = $3,
                 user_rating = CASE WHEN $6 THEN NULL ELSE COALESCE($4, user_movies.user_rating) END,
@@ -75,8 +85,11 @@ public class UserMovieService
     {
         const string sql = @"
             SELECT movie_id, status, user_rating, notes, added_at, updated_at
-            FROM user_movies
-            WHERE user_id = $1 AND movie_id = $2";
+            FROM user_movies um
+            JOIN movies m ON m.id = um.movie_id
+            WHERE um.user_id = $1
+              AND um.movie_id = $2
+              AND COALESCE(m.is_adult, false) = false";
 
         await using var conn = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(sql, conn);
@@ -107,7 +120,8 @@ public class UserMovieService
                    m.poster_path, m.imdb_id
             FROM user_movies um
             JOIN movies m ON m.id = um.movie_id
-            WHERE um.user_id = $1";
+            WHERE um.user_id = $1
+              AND COALESCE(m.is_adult, false) = false";
 
         if (!string.IsNullOrWhiteSpace(status))
             sql += " AND um.status = $2";
