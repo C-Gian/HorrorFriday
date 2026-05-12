@@ -1636,8 +1636,8 @@ select {
     top: 0;
     left: 0;
     right: 0;
-    height: min(74vh, 760px);
-    min-height: 560px;
+    height: min(100vh, 1060px);
+    min-height: 860px;
     z-index: 0;
     background-size: cover;
     background-position: center center;
@@ -1683,6 +1683,55 @@ select {
     color: var(--text-secondary);
     font-size: 13px;
     cursor: pointer;
+}
+
+.md-hero-back {
+    position: relative;
+    overflow: hidden;
+    min-height: 40px;
+    padding: 0 17px;
+    border-color: rgba(232,224,212,0.2);
+    background:
+        linear-gradient(180deg, rgba(23,21,19,0.76), rgba(7,6,5,0.68)),
+        radial-gradient(circle at 18% 0%, rgba(212,74,74,0.18), transparent 42%);
+    color: rgba(239,226,207,0.82);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.05);
+    transition: border-color 0.22s ease, color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.md-hero-back::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.16) 42%, transparent 68%);
+    transform: translateX(-130%);
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+.md-hero-back svg {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.22s ease;
+}
+
+.md-hero-back:hover {
+    border-color: rgba(212,74,74,0.52);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 20px 44px rgba(0,0,0,0.42), 0 0 24px rgba(155,28,28,0.16), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+.md-hero-back:hover::before {
+    transform: translateX(130%);
+}
+
+.md-hero-back:hover svg {
+    transform: translateX(-3px);
 }
 
 .md-layout-grid {
