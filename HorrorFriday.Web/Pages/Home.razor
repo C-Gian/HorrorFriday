@@ -42,8 +42,8 @@
                         <input class="search-input"
                                type="text"
                                placeholder="@(IsAiMode
-                                   ? "Descrivi atmosfera, sensazione, memoria di un film…"
-                                   : "Cerca per titolo, regista, attore…")"
+                                   ? "Describe a mood, feeling, or half-remembered scene..."
+                                   : "Search by title, director, actor...")"
                                value="@SearchQuery"
                                @oninput="HandleSearchInput"
                                @onkeydown="HandleSearchKeyDown"
@@ -55,7 +55,7 @@
                             }
                             else
                             {
-                                <span>Cerca</span>
+                                <span>Search</span>
                             }
                         </button>
                     </div>
@@ -106,7 +106,7 @@
                             Semantic Search
                         </div>
                         <p class="ai-explain-text">
-                            La tua query viene trasformata in un vettore di 1536 dimensioni tramite OpenAI e confrontata con tutti i film usando <strong>pgvector cosine similarity</strong>. Descrivi atmosfere, memorie, sensazioni — non serve il titolo esatto.
+                            Your query is converted into a 1536-dimension vector with OpenAI and compared against the catalog using <strong>pgvector cosine similarity</strong>. Describe moods, memories, and sensations; you do not need the exact title.
                         </p>
                     </div>
                 }
@@ -115,15 +115,15 @@
                 @if (IsAiMode && string.IsNullOrWhiteSpace(SearchQuery))
                 {
                     <div class="ai-hint-strip">
-                        <span class="ai-hint-label">Prova:</span>
+                        <span class="ai-hint-label">Try:</span>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "slow burn folk horror set in winter"'>
-                            "slow burn folk horror in inverno"
+                            "slow burn folk horror set in winter"
                         </button>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "something like Hereditary but more cosmic"'>
-                            "come Hereditary ma più cosmico"
+                            "something like Hereditary but more cosmic"
                         </button>
                         <button class="ai-hint-example" @onclick='() => SearchQuery = "horror movie on an island"'>
-                            "horror su un'isola"
+                            "horror movie on an island"
                         </button>
                     </div>
                 }
@@ -200,9 +200,20 @@
 
                     @* Filter actions *@
                     <div class="hf-filter-actions">
+                        @if (ActiveFilterCount > 0)
+                        {
+                            <div class="hf-filter-actions__summary">
+                                <button type="button" class="hf-clear-btn" @onclick="ClearAllFilters">
+                                    Clear filters
+                                </button>
+                                <span class="hf-active-count">
+                                    @ActiveFilterCount filter@(ActiveFilterCount > 1 ? "s" : "") active
+                                </span>
+                            </div>
+                        }
                         <button class="hf-more-toggle @(IsAdvancedOpen ? "hf-more-toggle--open" : "")"
                                 @onclick="ToggleAdvanced" type="button">
-                            @(IsAdvancedOpen ? "Fewer filters" : "More filters")
+                            @(IsAdvancedOpen ? "Show fewer filters" : "Show more filters")
                             <span class="hf-more-toggle__caret">▾</span>
                         </button>
                     </div>
@@ -371,17 +382,6 @@
                                     </div>
                                     <span class="hf-toggle__label">Include upcoming movies</span>
                                 </div>
-                            </div>
-                            <div class="hf-filters__footer-right">
-                                @if (ActiveFilterCount > 0)
-                                {
-                                    <span class="hf-active-count">
-                                        @ActiveFilterCount filter@(ActiveFilterCount > 1 ? "s" : "") active
-                                    </span>
-                                    <button type="button" class="hf-clear-btn" @onclick="ClearAllFilters">
-                                        Clear filters
-                                    </button>
-                                }
                             </div>
                         </div>
                     </div>

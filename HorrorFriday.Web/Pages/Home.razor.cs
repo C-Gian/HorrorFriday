@@ -53,6 +53,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
     protected List<string> AllCertifications { get; set; } = new();
     protected HashSet<int> SelectedProviderIds { get; set; } = new();
     protected HashSet<string> SelectedCertifications { get; set; } = new();
+    private bool _isBrowserRegionDefault;
 
     protected IEnumerable<RegionOption> RegionOptions =>
         new[] { new RegionOption("", "Any country") }
@@ -189,7 +190,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
         + (IncludeUpcoming ? 1 : 0)
         + HideStatuses.Count
         + (MediaType != "all" ? 1 : 0)
-        + (!string.IsNullOrEmpty(SelectedRegion) ? 1 : 0)
+        + (!string.IsNullOrEmpty(SelectedRegion) && !_isBrowserRegionDefault ? 1 : 0)
         + SelectedProviderIds.Count
         + SelectedCertifications.Count;
 
@@ -217,24 +218,20 @@ public partial class Home : ComponentBase, IAsyncDisposable
         await AuthService.InitializeAsync();
 
         var restored = await TryRestoreFilterStateAsync();
-        if (!restored)
-        {
-            await Task.WhenAll(LoadGenres(), LoadRegions(), LoadProviders());
-            await TryPreSelectRegionFromBrowserAsync();
-        }
 
         if (restored && _restoredCachedResults)
         {
+            _ = LoadFilterCatalogsForRestoredStateAsync();
             _pendingScrollRestore = true;
             return;
         }
 
-        if (restored)
-        {
-            await LoadFilterCatalogsForRestoredStateAsync();
-        }
+        var searchTask = ExecuteSearch();
+        _ = restored
+            ? LoadFilterCatalogsForRestoredStateAsync()
+            : LoadInitialFilterCatalogsAsync();
 
-        await ExecuteSearch();
+        await searchTask;
 
         if (restored)
         {
@@ -285,6 +282,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
             CurrentPage     = state.CurrentPage;
 
             SelectedRegion         = state.SelectedRegion;
+            _isBrowserRegionDefault = state.IsBrowserRegionDefault;
             SelectedProviderIds    = state.SelectedProviderIds.ToHashSet();
             SelectedCertifications = state.SelectedCertifications.ToHashSet();
 
@@ -315,12 +313,35 @@ public partial class Home : ComponentBase, IAsyncDisposable
 
     private async Task LoadFilterCatalogsForRestoredStateAsync()
     {
-        await Task.WhenAll(LoadGenres(), LoadRegions());
+        try
+        {
+            await Task.WhenAll(LoadGenres(), LoadRegions());
 
-        if (!string.IsNullOrEmpty(SelectedRegion))
-            await Task.WhenAll(LoadProviders(), LoadCertifications());
-        else
-            await LoadProviders();
+            if (!string.IsNullOrEmpty(SelectedRegion))
+                await Task.WhenAll(LoadProviders(), LoadCertifications());
+            else
+                await LoadProviders();
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Failed to load filter catalogs: {ex.Message}");
+        }
+    }
+
+    private async Task LoadInitialFilterCatalogsAsync()
+    {
+        try
+        {
+            await Task.WhenAll(LoadGenres(), LoadRegions(), LoadProviders());
+            await TryPreSelectRegionFromBrowserAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Failed to load initial filter catalogs: {ex.Message}");
+        }
     }
 
     private async Task UpdateInfiniteScrollObserverAsync()
@@ -378,6 +399,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
             if (!string.IsNullOrEmpty(code) && AllRegions.Contains(code, StringComparer.OrdinalIgnoreCase))
             {
                 SelectedRegion = code.ToUpperInvariant();
+                _isBrowserRegionDefault = true;
                 await Task.WhenAll(LoadProviders(), LoadCertifications());
             }
         }
@@ -713,6 +735,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
     protected async Task OnRegionChangedAsync(string value)
     {
         SelectedRegion = string.IsNullOrEmpty(value) ? null : value;
+        _isBrowserRegionDefault = false;
         SelectedProviderIds.Clear();
         SelectedCertifications.Clear();
         await Task.WhenAll(LoadProviders(), LoadCertifications());
@@ -963,8 +986,11 @@ public partial class Home : ComponentBase, IAsyncDisposable
         SortDirection = DefaultSortDirection;
         IncludeUpcoming = false;
         MediaType = "all";
+        SelectedRegion = null;
+        _isBrowserRegionDefault = false;
         SelectedProviderIds.Clear();
         SelectedCertifications.Clear();
+        AllCertifications.Clear();
         await LoadProviders();
         ResetToFirstPage();
     }
@@ -992,6 +1018,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
                 SortDirection   = SortDirection,
                 IncludeUpcoming = IncludeUpcoming,
                 SelectedRegion  = SelectedRegion,
+                IsBrowserRegionDefault = _isBrowserRegionDefault,
                 SelectedProviderIds    = SelectedProviderIds.ToList(),
                 SelectedCertifications = SelectedCertifications.ToList(),
                 AllGenres         = AllGenres,
@@ -1103,6 +1130,7 @@ public partial class Home : ComponentBase, IAsyncDisposable
         public string SortDirection { get; set; } = "desc";
         public bool IncludeUpcoming { get; set; }
         public string? SelectedRegion { get; set; }
+        public bool IsBrowserRegionDefault { get; set; }
         public List<int> SelectedProviderIds { get; set; } = [];
         public List<string> SelectedCertifications { get; set; } = [];
         public List<string> AllGenres { get; set; } = [];

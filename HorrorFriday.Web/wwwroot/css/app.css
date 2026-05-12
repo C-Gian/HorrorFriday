@@ -1021,6 +1021,13 @@ select {
     margin-top: 4px;
 }
 
+.hf-filter-actions__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 /* More-filters expand toggle */
 .hf-more-toggle {
     background: none;
