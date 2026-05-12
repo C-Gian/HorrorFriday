@@ -9,7 +9,7 @@ using HorrorFriday.Web.Services;
 
 namespace HorrorFriday.Web.Pages;
 
-public partial class Home : ComponentBase
+public partial class Home : ComponentBase, IAsyncDisposable
 {
     // ─────────────── Injected services ───────────────
 
@@ -143,6 +143,7 @@ public partial class Home : ComponentBase
     protected int CurrentPage { get; set; } = 1;
     protected int TotalPages { get; set; }
     protected bool IsLoading { get; set; }
+    protected bool IsLoadingMore { get; set; }
 
     private const int PageSize = 24;
 
@@ -204,8 +205,12 @@ public partial class Home : ComponentBase
 
     private bool _pendingScrollRestore;
     private bool _restoredCachedResults;
+    private bool _canLoadMoreResults;
+    private bool _isInfiniteObserverActive;
     private double _scrollRestoreY;
-    private const int FilterStateVersion = 2;
+    private ElementReference _loadMoreSentinel;
+    private DotNetObjectReference<Home>? _dotNetRef;
+    private const int FilterStateVersion = 3;
 
     protected override async Task OnInitializedAsync()
     {
@@ -245,6 +250,8 @@ public partial class Home : ComponentBase
             try { await JS.InvokeVoidAsync("hfRestoreScroll", _scrollRestoreY); }
             catch { }
         }
+
+        await UpdateInfiniteScrollObserverAsync();
     }
 
     private async Task<bool> TryRestoreFilterStateAsync()
@@ -290,6 +297,7 @@ public partial class Home : ComponentBase
             TotalPages        = state.TotalPages;
             MovieStatuses     = state.MovieStatuses;
             _restoredCachedResults = state.CacheVersion == FilterStateVersion && Movies is not null;
+            _canLoadMoreResults = _restoredCachedResults;
             if (!_restoredCachedResults)
             {
                 Movies = null;
@@ -313,6 +321,53 @@ public partial class Home : ComponentBase
             await Task.WhenAll(LoadProviders(), LoadCertifications());
         else
             await LoadProviders();
+    }
+
+    private async Task UpdateInfiniteScrollObserverAsync()
+    {
+        try
+        {
+            if (_canLoadMoreResults && Movies is { Count: > 0 } && CurrentPage < TotalPages)
+            {
+                _dotNetRef ??= DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("hfInfiniteScroll.observe", _loadMoreSentinel, _dotNetRef);
+                _isInfiniteObserverActive = true;
+            }
+            else
+            {
+                await DisconnectInfiniteScrollAsync();
+            }
+        }
+        catch { }
+    }
+
+    private async Task DisconnectInfiniteScrollAsync()
+    {
+        if (!_isInfiniteObserverActive) return;
+
+        try { await JS.InvokeVoidAsync("hfInfiniteScroll.disconnect"); }
+        catch { }
+        _isInfiniteObserverActive = false;
+    }
+
+    [JSInvokable]
+    public async Task LoadMoreResultsAsync()
+    {
+        if (!_canLoadMoreResults || IsLoading || IsLoadingMore || Movies is null || CurrentPage >= TotalPages)
+            return;
+
+        var previousPage = CurrentPage;
+        CurrentPage++;
+        var loaded = await ExecuteSearch(append: true);
+        if (!loaded)
+            CurrentPage = previousPage;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("hfInfiniteScroll.disconnect"); }
+        catch { }
+        _dotNetRef?.Dispose();
     }
 
     private async Task TryPreSelectRegionFromBrowserAsync()
@@ -398,12 +453,23 @@ public partial class Home : ComponentBase
 
     // ─────────────── Search ───────────────
 
-    protected async Task ExecuteSearch()
+    protected async Task<bool> ExecuteSearch(bool append = false)
     {
+        if (!append)
+        {
+            _canLoadMoreResults = false;
+            await DisconnectInfiniteScrollAsync();
+        }
+
         OpenStatusPickerId = null;
         SearchError = null;
-        IsLoading = true;
+        if (append)
+            IsLoadingMore = true;
+        else
+            IsLoading = true;
         StateHasChanged();
+        var loadedPageMovies = new List<MovieDto>();
+        var success = false;
 
         try
         {
@@ -449,9 +515,16 @@ public partial class Home : ComponentBase
                 var result = await response.Content.ReadFromJsonAsync<PagedResult<MovieDto>>();
                 if (result is not null)
                 {
-                    Movies = result.Items;
+                    loadedPageMovies = result.Items;
+                    if (append && Movies is not null)
+                        Movies.AddRange(loadedPageMovies);
+                    else
+                        Movies = loadedPageMovies;
+
                     TotalCount = result.TotalCount;
                     TotalPages = result.TotalPages;
+                    _canLoadMoreResults = true;
+                    success = true;
                 }
             }
             else
@@ -466,36 +539,55 @@ public partial class Home : ComponentBase
                 {
                     SearchError = $"Search error ({(int)response.StatusCode}).";
                 }
-                SetEmptyResults();
+                if (!append)
+                    SetEmptyResults();
             }
 
             // Load user statuses for the returned movies
-            if (AuthService.IsLoggedIn && Movies?.Count > 0)
-                await LoadMovieStatusesAsync(Movies.Select(m => m.Id).ToList());
-            else
+            if (AuthService.IsLoggedIn && loadedPageMovies.Count > 0)
+                await LoadMovieStatusesAsync(loadedPageMovies.Select(m => m.Id).ToList(), merge: append);
+            else if (!append)
                 MovieStatuses.Clear();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Home] Search failed: {ex.Message}");
-            SetEmptyResults();
+            if (!append)
+                SetEmptyResults();
         }
         finally
         {
-            IsLoading = false;
+            if (append)
+                IsLoadingMore = false;
+            else
+                IsLoading = false;
             StateHasChanged();
         }
+
+        return success;
     }
 
     protected async Task ExecuteSearchFromButton()
     {
-        CurrentPage = 1;
+        ResetToFirstPage();
         await ExecuteSearch();
+    }
+
+    private void MarkResultsStale()
+    {
+        _canLoadMoreResults = false;
+        _ = InvokeAsync(DisconnectInfiniteScrollAsync);
+    }
+
+    private void ResetToFirstPage()
+    {
+        CurrentPage = 1;
+        MarkResultsStale();
     }
 
     // ─────────────── User movie statuses ───────────────
 
-    private async Task LoadMovieStatusesAsync(List<int> movieIds)
+    private async Task LoadMovieStatusesAsync(List<int> movieIds, bool merge = false)
     {
         try
         {
@@ -514,19 +606,29 @@ public partial class Home : ComponentBase
                 var statuses = System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, string>>(
                     body,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                MovieStatuses = statuses ?? new();
+                if (merge)
+                {
+                    foreach (var (movieId, status) in statuses ?? new())
+                        MovieStatuses[movieId] = status;
+                }
+                else
+                {
+                    MovieStatuses = statuses ?? new();
+                }
                 Console.WriteLine($"[Home] Loaded {MovieStatuses.Count} statuses for {movieIds.Count} movies.");
             }
             else
             {
                 Console.WriteLine($"[Home] LoadStatuses failed {response.StatusCode}: {body}");
-                MovieStatuses = new();
+                if (!merge)
+                    MovieStatuses = new();
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Home] LoadStatuses exception: {ex.Message}");
-            MovieStatuses = new();
+            if (!merge)
+                MovieStatuses = new();
         }
     }
 
@@ -599,13 +701,13 @@ public partial class Home : ComponentBase
         else
             HideStatuses.Add(status);
 
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected void SetMediaType(string type)
     {
         MediaType = type;
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected async Task OnRegionChangedAsync(string value)
@@ -614,7 +716,7 @@ public partial class Home : ComponentBase
         SelectedProviderIds.Clear();
         SelectedCertifications.Clear();
         await Task.WhenAll(LoadProviders(), LoadCertifications());
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected void ToggleProvider(int providerId)
@@ -623,7 +725,7 @@ public partial class Home : ComponentBase
             SelectedProviderIds.Remove(providerId);
         else
             SelectedProviderIds.Add(providerId);
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected void ToggleCertification(string cert)
@@ -632,7 +734,7 @@ public partial class Home : ComponentBase
             SelectedCertifications.Remove(cert);
         else
             SelectedCertifications.Add(cert);
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     // ─────────────── Input clamping (prevents invalid input) ───────────────
@@ -672,6 +774,54 @@ public partial class Home : ComponentBase
     {
         if (string.IsNullOrEmpty(raw)) return "";
         return new string(raw.Where(char.IsDigit).Take(3).ToArray());
+    }
+
+    protected void SetYearFromText(string? value)
+    {
+        YearFromText = ClampYearInput(value);
+        ResetToFirstPage();
+    }
+
+    protected void SetYearToText(string? value)
+    {
+        YearToText = ClampYearInput(value);
+        ResetToFirstPage();
+    }
+
+    protected void SetMinRatingText(string? value)
+    {
+        MinRatingText = ClampRatingInput(value);
+        ResetToFirstPage();
+    }
+
+    protected void SetMaxRatingText(string? value)
+    {
+        MaxRatingText = ClampRatingInput(value);
+        ResetToFirstPage();
+    }
+
+    protected void SetMaxRuntimeText(string? value)
+    {
+        MaxRuntimeText = ClampRuntimeInput(value);
+        ResetToFirstPage();
+    }
+
+    protected void SetSortBy(string value)
+    {
+        SortBy = value;
+        ResetToFirstPage();
+    }
+
+    protected void SetSortDirection(string value)
+    {
+        SortDirection = value;
+        ResetToFirstPage();
+    }
+
+    protected void ToggleIncludeUpcoming()
+    {
+        IncludeUpcoming = !IncludeUpcoming;
+        ResetToFirstPage();
     }
 
     // ─────────────── Parse helpers ───────────────
@@ -714,6 +864,7 @@ public partial class Home : ComponentBase
     protected async Task HandleSearchInput(ChangeEventArgs e)
     {
         SearchQuery = e.Value?.ToString() ?? "";
+        ResetToFirstPage();
 
         if (IsAiMode || SearchQuery.Length < 2)
         {
@@ -775,7 +926,7 @@ public partial class Home : ComponentBase
             IncludedGenres.Add(genre);
         }
 
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected string GetGenreState(string genre)
@@ -793,6 +944,7 @@ public partial class Home : ComponentBase
     protected void ToggleAiMode()
     {
         IsAiMode = !IsAiMode;
+        ResetToFirstPage();
     }
 
     protected async Task ClearAllFilters()
@@ -814,7 +966,7 @@ public partial class Home : ComponentBase
         SelectedProviderIds.Clear();
         SelectedCertifications.Clear();
         await LoadProviders();
-        CurrentPage = 1;
+        ResetToFirstPage();
     }
 
     protected async Task NavigateToMovie(int movieId)

@@ -84,7 +84,7 @@ public class UserMovieService
     public async Task<UserMovieEntryDto?> GetEntryAsync(int userId, int movieId)
     {
         const string sql = @"
-            SELECT movie_id, status, user_rating, notes, added_at, updated_at
+            SELECT um.movie_id, um.status, um.user_rating, um.notes, um.added_at, um.updated_at
             FROM user_movies um
             JOIN movies m ON m.id = um.movie_id
             WHERE um.user_id = $1

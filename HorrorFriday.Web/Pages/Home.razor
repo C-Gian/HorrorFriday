@@ -220,14 +220,14 @@
                                            placeholder="1900" inputmode="numeric"
                                            maxlength="4" pattern="[0-9]*"
                                            @bind:get="YearFromText"
-                                           @bind:set="v => YearFromText = ClampYearInput(v)"
+                                           @bind:set="SetYearFromText"
                                            @bind:event="oninput" />
                                     <span class="hf-dash">—</span>
                                     <input type="text" class="hf-input"
                                            placeholder="2026" inputmode="numeric"
                                            maxlength="4" pattern="[0-9]*"
                                            @bind:get="YearToText"
-                                           @bind:set="v => YearToText = ClampYearInput(v)"
+                                           @bind:set="SetYearToText"
                                            @bind:event="oninput" />
                                 </div>
                             </div>
@@ -240,14 +240,14 @@
                                            placeholder="0" inputmode="decimal"
                                            maxlength="4"
                                            @bind:get="MinRatingText"
-                                           @bind:set="v => MinRatingText = ClampRatingInput(v)"
+                                           @bind:set="SetMinRatingText"
                                            @bind:event="oninput" />
                                     <span class="hf-dash">—</span>
                                     <input type="text" class="hf-input hf-input--rating"
                                            placeholder="10" inputmode="decimal"
                                            maxlength="4"
                                            @bind:get="MaxRatingText"
-                                           @bind:set="v => MaxRatingText = ClampRatingInput(v)"
+                                           @bind:set="SetMaxRatingText"
                                            @bind:event="oninput" />
                                 </div>
                             </div>
@@ -260,7 +260,7 @@
                                            placeholder="any" inputmode="numeric"
                                            maxlength="3" pattern="[0-9]*"
                                            @bind:get="MaxRuntimeText"
-                                           @bind:set="v => MaxRuntimeText = ClampRuntimeInput(v)"
+                                           @bind:set="SetMaxRuntimeText"
                                            @bind:event="oninput" />
                                     <span class="hf-suffix">min</span>
                                 </div>
@@ -274,14 +274,15 @@
                                                   Options="SortOptions"
                                                   TextSelector="o => o.Label"
                                                   ValueSelector="o => o.Value"
-                                                  @bind-Value="SortBy" />
+                                                  Value="@SortBy"
+                                                  ValueChanged="SetSortBy" />
                                     <div class="hf-sort-dir" role="group">
                                         <button type="button"
                                                 class="hf-sort-dir__btn @(SortDirection == "desc" ? "hf-sort-dir__btn--active" : "")"
-                                                @onclick='() => SortDirection = "desc"'>↓</button>
+                                                @onclick='() => SetSortDirection("desc")'>↓</button>
                                         <button type="button"
                                                 class="hf-sort-dir__btn @(SortDirection == "asc" ? "hf-sort-dir__btn--active" : "")"
-                                                @onclick='() => SortDirection = "asc"'>↑</button>
+                                                @onclick='() => SetSortDirection("asc")'>↑</button>
                                     </div>
                                 </div>
                             </div>
@@ -364,7 +365,7 @@
                         <div class="hf-filters__footer">
                             <div class="hf-filters__footer-left">
                                 <div class="hf-toggle @(IncludeUpcoming ? "hf-toggle--on" : "")"
-                                     @onclick="() => IncludeUpcoming = !IncludeUpcoming">
+                                     @onclick="ToggleIncludeUpcoming">
                                     <div class="hf-toggle__track">
                                         <div class="hf-toggle__thumb"></div>
                                     </div>
@@ -434,18 +435,20 @@
                 }
             </div>
 
-            @if (TotalPages > 1)
-            {
-                <div class="pagination">
-                    <button class="page-btn" disabled="@(CurrentPage <= 1)" @onclick="PreviousPage">
-                        ‹ Previous
-                    </button>
-                    <span class="page-info">Page @CurrentPage of @TotalPages</span>
-                    <button class="page-btn" disabled="@(CurrentPage >= TotalPages)" @onclick="NextPage">
-                        Next ›
-                    </button>
-                </div>
-            }
+            <div class="infinite-scroll-sentinel" @ref="_loadMoreSentinel">
+                @if (IsLoadingMore)
+                {
+                    <LoadingSpinner Size="small" Message="Loading more..." />
+                }
+                else if (CurrentPage < TotalPages)
+                {
+                    <span>@Movies.Count.ToString("N0") of @TotalCount.ToString("N0") shown</span>
+                }
+                else
+                {
+                    <span>End of results</span>
+                }
+            </div>
         }
         else if (Movies is not null && Movies.Count == 0)
         {

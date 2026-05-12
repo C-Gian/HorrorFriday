@@ -17,6 +17,35 @@ window.hfRestoreScroll = (y) => {
     });
 };
 
+let _hfInfiniteObserver = null;
+let _hfInfinitePending = false;
+
+window.hfInfiniteScroll = {
+    observe: function (element, dotNetRef) {
+        if (!element) return;
+
+        this.disconnect();
+        _hfInfiniteObserver = new IntersectionObserver(function (entries) {
+            if (_hfInfinitePending || !entries.some(function (entry) { return entry.isIntersecting; })) {
+                return;
+            }
+
+            _hfInfinitePending = true;
+            dotNetRef.invokeMethodAsync('LoadMoreResultsAsync')
+                .finally(function () { _hfInfinitePending = false; });
+        }, { root: null, rootMargin: '700px 0px', threshold: 0.01 });
+
+        _hfInfiniteObserver.observe(element);
+    },
+    disconnect: function () {
+        if (_hfInfiniteObserver) {
+            _hfInfiniteObserver.disconnect();
+            _hfInfiniteObserver = null;
+        }
+        _hfInfinitePending = false;
+    }
+};
+
 window.getBrowserRegion = function () {
     var lang = (navigator.languages && navigator.languages[0]) || navigator.language || '';
     var parts = lang.split('-');

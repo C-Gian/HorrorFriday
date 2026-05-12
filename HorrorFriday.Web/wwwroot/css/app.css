@@ -1418,6 +1418,17 @@ select {
     color: var(--text-muted);
 }
 
+.infinite-scroll-sentinel {
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 30px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
 
 /* ============================================================
    SCROLL ROW (horizontal movie strips on homepage)
