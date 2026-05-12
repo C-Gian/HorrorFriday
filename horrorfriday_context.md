@@ -170,6 +170,15 @@ embedding             —   vector(1536), OpenAI text-embedding-3-small, per sem
 ### Blazor
 - `EventCallback` handler che usa JS interop prima di navigare → `async Task`, non `void`
 
+### Build / Git hygiene
+- **Mai lasciare output di build dentro la repo.** Non usare cartelle tipo `.verify_details_build/` come `OutDir` se poi non vengono rimosse subito: Git mostra centinaia di file non tracciati e sembra che siano state fatte 200+ modifiche.
+- Per verificare build senza sporcare il working tree, preferire un output temporaneo fuori repo, ad esempio una directory sotto `%TEMP%`, oppure usare la build standard solo se non crea nuovi file non tracciati.
+- Se per necessità si usa una cartella temporanea nella repo, eliminarla prima della risposta finale con `git clean -fd -- <cartella>` dopo aver verificato che contenga solo output generato.
+- Prima di chiudere ogni task con build eseguita, controllare sempre:
+  - `git status --short`
+  - `git ls-files --others --exclude-standard`
+- Lo stato finale atteso per modifiche alla Movie Detail deve mostrare solo i file sorgente realmente toccati, non DLL/runtime/output generati.
+
 ### Security
 - Password: BCrypt hashing, policy 8–30 chars, upper+lower+digit (frontend + backend)
 - Reset token: token raw URL-safe base64 nell'email, solo hash SHA-256 nel DB
